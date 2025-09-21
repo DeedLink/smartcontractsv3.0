@@ -12,7 +12,7 @@ contract PropertyNFT is ERC721, Ownable {
 
     constructor(address initialOwner) ERC721("RealEstateNFT", "RE-NFT") Ownable(initialOwner){}
 
-    function mintProperty(address to, string memory uri) external onlyOwner {
+    function mintProperty(address to, string memory uri) external {
         uint256 tokenId = nextTokenId++;
         _safeMint(to, tokenId);
         tokenURIMap[tokenId] = uri;
