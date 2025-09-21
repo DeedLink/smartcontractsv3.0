@@ -12,17 +12,9 @@ contract PropertyNFT is ERC721, Ownable {
 
     constructor(address initialOwner) ERC721("RealEstateNFT", "RE-NFT") Ownable(initialOwner){}
 
-    function setMerkleRoot(bytes32 root) external onlyOwner {
-        merkleRoot = root;
-    }
-
-    function mintProperty(string memory uri, bytes32[] calldata proof) external {
-        require(
-            MerkleProof.verify(proof, merkleRoot, keccak256(abi.encodePacked(msg.sender))),
-            "Not whitelisted"
-        );
+    function mintProperty(address to, string memory uri) external onlyOwner {
         uint256 tokenId = nextTokenId++;
-        _safeMint(msg.sender, tokenId);
+        _safeMint(to, tokenId);
         tokenURIMap[tokenId] = uri;
     }
 
