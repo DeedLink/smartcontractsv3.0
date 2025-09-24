@@ -6,17 +6,24 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract PropertyNFT is ERC721, Ownable {
     uint256 public nextTokenId;
-    mapping(uint256 => string) public tokenURIMap;
+    struct Metadata {
+        string ipfsURI;
+        string databaseURI;
+    }
+    mapping(uint256 => Metadata) private _tokenMetadata;
 
     constructor(address initialOwner) ERC721("RealEstateNFT", "RE-NFT") Ownable(initialOwner){}
 
-    function mintProperty(address to, string memory uri) external {
+    function mintProperty(address to, string memory ipfsURI, string memory databaseURI) external {
         uint256 tokenId = nextTokenId++;
         _safeMint(to, tokenId);
-        tokenURIMap[tokenId] = uri;
+        _tokenMetadata[tokenId] = Metadata(ipfsURI, databaseURI);
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        return tokenURIMap[tokenId];
+        return _tokenMetadata[tokenId].ipfsURI;
+    }
+    function dbURI(uint256 tokenId) public view returns (string memory) {
+        return _tokenMetadata[tokenId].databaseURI;
     }
 }
