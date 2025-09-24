@@ -23,7 +23,19 @@ contract PropertyNFT is ERC721, Ownable {
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         return _tokenMetadata[tokenId].ipfsURI;
     }
+    
     function dbURI(uint256 tokenId) public view returns (string memory) {
         return _tokenMetadata[tokenId].databaseURI;
+    }
+
+    function getProperty(uint256 tokenId) public view returns (
+        address owner,
+        string memory ipfsURI,
+        string memory databaseURI
+    ) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        owner = ownerOf(tokenId);
+        Metadata memory meta = _tokenMetadata[tokenId];
+        return (owner, meta.ipfsURI, meta.databaseURI);
     }
 }
