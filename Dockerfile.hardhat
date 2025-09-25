@@ -1,0 +1,10 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm install
+
+COPY contracts/ scripts/ hardhat.config.js ./
+
+CMD ["npx", "hardhat", "run", "scripts/deploy.js", "--network", "anvil"]
