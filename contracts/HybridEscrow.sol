@@ -13,25 +13,16 @@ contract HybridEscrow is ReentrancyGuard {
     uint256 public price;
     bool public isBuyerDeposited;
     bool public isSellerDeposited;
-
-    // Escrow type
     EscrowType public escrowType;
 
-    // NFT-specific
     IERC721 public propertyNFT;
     uint256 public tokenId;
-
-    // Fractional token-specific
     IERC20 public fractionalToken;
     uint256 public tokenAmount;
 
     constructor(
-        address _buyer,
-        address _seller,
-        uint256 _price,
-        EscrowType _escrowType,
-        address assetAddress,
-        uint256 assetAmountOrId
+        address _buyer, address _seller, uint256 _price, EscrowType _escrowType,
+        address assetAddress, uint256 assetAmountOrId
     ) {
         buyer = _buyer;
         seller = _seller;
@@ -40,42 +31,36 @@ contract HybridEscrow is ReentrancyGuard {
 
         if (_escrowType == EscrowType.NFT) {
             propertyNFT = IERC721(assetAddress);
-            tokenId = assetAmountOrId; // tokenId
+            tokenId = assetAmountOrId;
         } else {
             fractionalToken = IERC20(assetAddress);
-            tokenAmount = assetAmountOrId; // amount of fractional tokens
+            tokenAmount = assetAmountOrId;
         }
     }
 
-    // Buyer deposits ETH
     function depositPayment() external payable nonReentrant {
         require(msg.sender == buyer, "Only buyer");
         require(msg.value == price, "Incorrect payment");
         isBuyerDeposited = true;
     }
 
-    // Seller deposits asset
     function depositAsset() external nonReentrant {
         require(msg.sender == seller, "Only seller");
-
+        
         if (escrowType == EscrowType.NFT) {
             propertyNFT.transferFrom(seller, address(this), tokenId);
         } else {
             fractionalToken.transferFrom(seller, address(this), tokenAmount);
         }
-
         isSellerDeposited = true;
     }
 
-    // Finalize transaction
     function finalize() external nonReentrant {
         require(isBuyerDeposited && isSellerDeposited, "Escrow not complete");
 
-        // Send ETH to seller
         (bool sent, ) = seller.call{value: price}("");
         require(sent, "ETH transfer failed");
 
-        // Send asset to buyer
         if (escrowType == EscrowType.NFT) {
             propertyNFT.transferFrom(address(this), buyer, tokenId);
         } else {
