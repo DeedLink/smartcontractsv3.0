@@ -93,8 +93,8 @@ contract PropertyNFT is ERC721, Ownable {
         address applicant, string memory ipfsURI, string memory databaseURI, PropertyStatus status, bool allSigned
     ) {
         PropertyApplication storage app = propertyApplications[applicationId];
-        bool allSigned = app.signatures[UserType.SURVEYOR] && app.signatures[UserType.NOTARY] && app.signatures[UserType.IVSL];
-        return (app.applicant, app.ipfsURI, app.databaseURI, app.status, allSigned);
+        bool isAllSigned = app.signatures[UserType.SURVEYOR] && app.signatures[UserType.NOTARY] && app.signatures[UserType.IVSL];
+        return (app.applicant, app.ipfsURI, app.databaseURI, app.status, isAllSigned);
     }
 
     function getSignatureStatus(uint256 applicationId) external view returns (
