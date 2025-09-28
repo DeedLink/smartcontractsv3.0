@@ -5,6 +5,11 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+interface IPropertyNFT {
+    function isFullySigned(uint256 tokenId) external view returns (bool);
+    function ownerOf(uint256 tokenId) external view returns (address);
+}
+
 contract HybridEscrow is ReentrancyGuard {
     enum EscrowType { NFT, FRACTIONAL }
 
@@ -14,14 +19,11 @@ contract HybridEscrow is ReentrancyGuard {
     bool public isBuyerDeposited;
     bool public isSellerDeposited;
 
-    // Escrow type
     EscrowType public escrowType;
 
-    // NFT-specific
     IERC721 public propertyNFT;
     uint256 public tokenId;
 
-    // Fractional token-specific
     IERC20 public fractionalToken;
     uint256 public tokenAmount;
 
@@ -40,25 +42,25 @@ contract HybridEscrow is ReentrancyGuard {
 
         if (_escrowType == EscrowType.NFT) {
             propertyNFT = IERC721(assetAddress);
-            tokenId = assetAmountOrId; // tokenId
+            tokenId = assetAmountOrId;
         } else {
             fractionalToken = IERC20(assetAddress);
-            tokenAmount = assetAmountOrId; // amount of fractional tokens
+            tokenAmount = assetAmountOrId;
         }
     }
 
-    // Buyer deposits ETH
     function depositPayment() external payable nonReentrant {
         require(msg.sender == buyer, "Only buyer");
         require(msg.value == price, "Incorrect payment");
         isBuyerDeposited = true;
     }
 
-    // Seller deposits asset
     function depositAsset() external nonReentrant {
         require(msg.sender == seller, "Only seller");
 
         if (escrowType == EscrowType.NFT) {
+            require(IPropertyNFT(address(propertyNFT)).ownerOf(tokenId) != address(0), "Property does not exist");
+            require(IPropertyNFT(address(propertyNFT)).isFullySigned(tokenId), "Property not fully signed");
             propertyNFT.transferFrom(seller, address(this), tokenId);
         } else {
             fractionalToken.transferFrom(seller, address(this), tokenAmount);
@@ -67,15 +69,12 @@ contract HybridEscrow is ReentrancyGuard {
         isSellerDeposited = true;
     }
 
-    // Finalize transaction
     function finalize() external nonReentrant {
         require(isBuyerDeposited && isSellerDeposited, "Escrow not complete");
 
-        // Send ETH to seller
         (bool sent, ) = seller.call{value: price}("");
         require(sent, "ETH transfer failed");
 
-        // Send asset to buyer
         if (escrowType == EscrowType.NFT) {
             propertyNFT.transferFrom(address(this), buyer, tokenId);
         } else {
