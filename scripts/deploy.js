@@ -1,47 +1,55 @@
-const { ethers } = require("hardhat");
+const hre = require("hardhat");
 
 async function main() {
-  // Get the deployer account
-  const [deployer] = await ethers.getSigners();
+  const [deployer, surveyor, notary, ivsl, buyer, seller] = await hre.ethers.getSigners();
+
   console.log("Deploying contracts with account:", deployer.address);
 
-  // Get account balance
-  const balance = await ethers.provider.getBalance(deployer.address);
-  console.log("Account balance:", ethers.formatEther(balance), "ETH");
-
   // Deploy PropertyNFT
-  console.log("\nDeploying PropertyNFT...");
-  const PropertyNFT = await ethers.getContractFactory("PropertyNFT");
+  const PropertyNFT = await hre.ethers.getContractFactory("PropertyNFT");
   const propertyNFT = await PropertyNFT.deploy(deployer.address);
-  await propertyNFT.waitForDeployment();
-  
-  const propertyNFTAddress = await propertyNFT.getAddress();
-  console.log("PropertyNFT deployed to:", propertyNFTAddress);
+  await propertyNFT.deployed();
+  console.log("PropertyNFT deployed at:", propertyNFT.address);
+
+  // Grant roles to surveyor, notary, ivsl
+  const SURVEYOR_ROLE = await propertyNFT.SURVEYOR_ROLE();
+  const NOTARY_ROLE = await propertyNFT.NOTARY_ROLE();
+  const IVSL_ROLE = await propertyNFT.IVSL_ROLE();
+
+  await propertyNFT.grantRole(SURVEYOR_ROLE, surveyor.address);
+  await propertyNFT.grantRole(NOTARY_ROLE, notary.address);
+  await propertyNFT.grantRole(IVSL_ROLE, ivsl.address);
+  console.log("Roles granted");
+
+  // Mint a property NFT to seller
+  await propertyNFT.mintProperty(seller.address, "ipfs://property1", "db://property1");
+  console.log("Property NFT minted to seller");
 
   // Deploy FractionTokenFactory
-  console.log("\nDeploying FractionTokenFactory...");
-  const FractionTokenFactory = await ethers.getContractFactory("FractionTokenFactory");
-  const fractionTokenFactory = await FractionTokenFactory.deploy();
-  await fractionTokenFactory.waitForDeployment();
-  
-  const factoryAddress = await fractionTokenFactory.getAddress();
-  console.log("FractionTokenFactory deployed to:", factoryAddress);
+  const FractionTokenFactory = await hre.ethers.getContractFactory("FractionTokenFactory");
+  const fractionFactory = await FractionTokenFactory.deploy();
+  await fractionFactory.deployed();
+  console.log("FractionTokenFactory deployed at:", fractionFactory.address);
 
-  // Verify deployment by checking contract properties
-  console.log("\n--- Verification ---");
-  console.log("PropertyNFT name:", await propertyNFT.name());
-  console.log("PropertyNFT symbol:", await propertyNFT.symbol());
-  console.log("PropertyNFT owner:", await propertyNFT.owner());
+  // Deploy HybridEscrow (example for NFT)
+  const HybridEscrow = await hre.ethers.getContractFactory("HybridEscrow");
+  const escrow = await HybridEscrow.deploy(
+    buyer.address,
+    seller.address,
+    hre.ethers.utils.parseEther("1"), // 1 ETH price
+    0, // EscrowType.NFT
+    propertyNFT.address,
+    0 // tokenId
+  );
+  await escrow.deployed();
+  console.log("HybridEscrow deployed at:", escrow.address);
 
-  console.log("\n--- Deployment Summary ---");
-  console.log("PropertyNFT:", propertyNFTAddress);
-  console.log("FractionTokenFactory:", factoryAddress);
-  console.log("Deployer:", deployer.address);
+  console.log("Deployment complete!");
 }
 
 main()
   .then(() => process.exit(0))
   .catch((error) => {
-    console.error("Deployment failed:", error);
+    console.error(error);
     process.exit(1);
   });
