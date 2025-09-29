@@ -224,12 +224,121 @@ describe("Smart Contract Integration Tests", function () {
                     escrow.connect(buyer).finalize()
                 ).to.be.revertedWith("Escrow not complete");
             });
-            
+
             it("should prevent unauthorized finalization", async function () {
                 await escrow.connect(buyer).depositPayment({ value: ethers.parseEther("1") });
                 await expect(
                     escrow.connect(seller).finalize()
                 ).to.be.revertedWith("Only buyer can finalize");
+            });
+        });
+    });
+
+    describe("Advanced Integration Scenarios", function () {
+        describe("PropertyNFT Advanced Features", function () {
+            it("should handle multiple properties for the same owner", async function () {
+                await propertyNFT.mintProperty(seller.address, "ipfs://property2", "db://property2");
+                expect(await propertyNFT.ownerOf(0)).to.equal(seller.address);
+                expect(await propertyNFT.ownerOf(1)).to.equal(seller.address);
+            });
+
+            it("should maintain separate signature states for different properties", async function () {
+                await propertyNFT.mintProperty(seller.address, "ipfs://property2", "db://property2");
+                
+                await propertyNFT.connect(surveyor).signProperty(0);
+                await propertyNFT.connect(notary).signProperty(0);
+                
+                expect(await propertyNFT.isFullySigned(0)).to.be.false;
+                expect(await propertyNFT.isFullySigned(1)).to.be.false;
+                
+                await propertyNFT.connect(surveyor).signProperty(1);
+                expect(await propertyNFT.isSignedBySurveyor(1)).to.be.true;
+                expect(await propertyNFT.isSignedByNotary(1)).to.be.false;
+            });
+        });
+
+        describe("FractionTokenFactory Advanced Features", function () {
+            it("should handle multiple fraction tokens for different properties", async function () {
+                // Mint and sign second property
+                await propertyNFT.mintProperty(seller.address, "ipfs://property2", "db://property2");
+                
+                // Sign both properties
+                for (let tokenId of [0, 1]) {
+                    await propertyNFT.connect(surveyor).signProperty(tokenId);
+                    await propertyNFT.connect(notary).signProperty(tokenId);
+                    await propertyNFT.connect(ivsl).signProperty(tokenId);
+                }
+
+                // Create fraction tokens for both properties
+                await fractionFactory.createFractionToken(
+                    0,
+                    "PropertyToken1",
+                    "PTKN1",
+                    ethers.parseUnits("1000", 18),
+                    propertyNFTAddress
+                );
+
+                await fractionFactory.createFractionToken(
+                    1,
+                    "PropertyToken2",
+                    "PTKN2",
+                    ethers.parseUnits("2000", 18),
+                    propertyNFTAddress
+                );
+
+                const token1Address = await fractionFactory.propertyToFractionToken(0);
+                const token2Address = await fractionFactory.propertyToFractionToken(1);
+                
+                expect(token1Address).to.not.equal(token2Address);
+                expect(token1Address).to.be.properAddress;
+                expect(token2Address).to.be.properAddress;
+            });
+        });
+
+        describe("HybridEscrow Advanced Features", function () {
+            beforeEach(async function () {
+                // Sign the property
+                await propertyNFT.connect(surveyor).signProperty(0);
+                await propertyNFT.connect(notary).signProperty(0);
+                await propertyNFT.connect(ivsl).signProperty(0);
+            });
+
+            it("should handle concurrent escrow agreements", async function () {
+                // Deploy second escrow for a different property
+                await propertyNFT.mintProperty(seller.address, "ipfs://property2", "db://property2");
+                const HybridEscrow = await ethers.getContractFactory("HybridEscrow");
+                const escrow2 = await HybridEscrow.deploy(
+                    buyer.address,
+                    seller.address,
+                    ethers.parseEther("2"),
+                    0,
+                    propertyNFTAddress,
+                    1
+                );
+
+                // Handle first escrow
+                await propertyNFT.connect(seller).approve(escrowAddress, 0);
+                await escrow.connect(buyer).depositPayment({ value: ethers.parseEther("1") });
+                await escrow.connect(seller).depositAsset();
+
+                // Handle second escrow
+                await propertyNFT.connect(seller).approve(await escrow2.getAddress(), 1);
+                await escrow2.connect(buyer).depositPayment({ value: ethers.parseEther("2") });
+                await escrow2.connect(seller).depositAsset();
+
+                // Verify independent states
+                expect(await propertyNFT.ownerOf(0)).to.equal(escrowAddress);
+                expect(await propertyNFT.ownerOf(1)).to.equal(await escrow2.getAddress());
+            });
+
+            it("should handle escrow cancellation and refunds", async function () {
+                // TODO: Implement this test once cancellation functionality is added to HybridEscrow
+                // This is a placeholder for future implementation
+            });
+
+            it("should handle partial payments with fractional tokens", async function () {
+                // TODO: Implement this test once fractional payment functionality is added
+                // This is a placeholder for future implementation
             });
         });
     });
