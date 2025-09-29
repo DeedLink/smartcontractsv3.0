@@ -20,65 +20,45 @@ contract HybridEscrow is ReentrancyGuard {
     bool public isSellerDeposited;
 
     EscrowType public escrowType;
-
-    IERC721 public propertyNFT;
     uint256 public tokenId;
-
-    IERC20 public fractionalToken;
-    uint256 public tokenAmount;
+    IERC721 public propertyNFT;
 
     constructor(
         address _buyer,
         address _seller,
         uint256 _price,
-        EscrowType _escrowType,
-        address assetAddress,
-        uint256 assetAmountOrId
+        EscrowType _type,
+        address _propertyNFT,
+        uint256 _tokenId
     ) {
         buyer = _buyer;
         seller = _seller;
         price = _price;
-        escrowType = _escrowType;
-
-        if (_escrowType == EscrowType.NFT) {
-            propertyNFT = IERC721(assetAddress);
-            tokenId = assetAmountOrId;
-        } else {
-            fractionalToken = IERC20(assetAddress);
-            tokenAmount = assetAmountOrId;
-        }
+        escrowType = _type;
+        propertyNFT = IERC721(_propertyNFT);
+        tokenId = _tokenId;
     }
 
-    function depositPayment() external payable nonReentrant {
+    function depositPayment() external payable {
         require(msg.sender == buyer, "Only buyer");
         require(msg.value == price, "Incorrect payment");
+        require(!isBuyerDeposited, "Already deposited");
         isBuyerDeposited = true;
     }
 
-    function depositAsset() external nonReentrant {
+    function depositAsset() external {
         require(msg.sender == seller, "Only seller");
-
-        if (escrowType == EscrowType.NFT) {
-            require(IPropertyNFT(address(propertyNFT)).ownerOf(tokenId) != address(0), "Property does not exist");
-            require(IPropertyNFT(address(propertyNFT)).isFullySigned(tokenId), "Property not fully signed");
-            propertyNFT.transferFrom(seller, address(this), tokenId);
-        } else {
-            fractionalToken.transferFrom(seller, address(this), tokenAmount);
-        }
-
+        require(!isSellerDeposited, "Already deposited");
+        propertyNFT.transferFrom(seller, address(this), tokenId);
         isSellerDeposited = true;
     }
 
     function finalize() external nonReentrant {
+        require(msg.sender == buyer, "Only buyer can finalize");
         require(isBuyerDeposited && isSellerDeposited, "Escrow not complete");
-
+        
+        propertyNFT.transferFrom(address(this), buyer, tokenId);
         (bool sent, ) = seller.call{value: price}("");
-        require(sent, "ETH transfer failed");
-
-        if (escrowType == EscrowType.NFT) {
-            propertyNFT.transferFrom(address(this), buyer, tokenId);
-        } else {
-            fractionalToken.transfer(buyer, tokenAmount);
-        }
+        require(sent, "Failed to send ETH");
     }
 }

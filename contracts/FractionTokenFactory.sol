@@ -22,8 +22,11 @@ contract FractionTokenFactory {
         require(propertyToFractionToken[propertyId] == address(0), "Fraction token already exists");
         
         IPropertyNFT propertyNFT = IPropertyNFT(propertyNFTAddr);
-        require(propertyNFT.ownerOf(propertyId) != address(0), "Property does not exist");
-        require(propertyNFT.isFullySigned(propertyId), "Property not fully signed");
+        try propertyNFT.ownerOf(propertyId) returns (address) {
+            require(propertyNFT.isFullySigned(propertyId), "Property not fully signed");
+        } catch {
+            revert("Property does not exist");
+        }
 
         FractionalToken newToken = new FractionalToken(
             name,
