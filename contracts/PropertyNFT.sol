@@ -30,7 +30,7 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
     }
 
-    function mintProperty(address to, string memory ipfsHash, string memory dbHash) external onlyOwner {
+    function mintProperty(address to, string memory ipfsHash, string memory dbHash) external {
         uint256 tokenId = nextTokenId++;
         _safeMint(to, tokenId);
         _tokenMetadata[tokenId] = Metadata(ipfsHash, dbHash);
