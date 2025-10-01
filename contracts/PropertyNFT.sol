@@ -58,6 +58,14 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         }
     }
 
+    function getRolesOf(address account) external view returns (bool surveyor, bool notary, bool ivsl) {
+        return (
+            hasRole(SURVEYOR_ROLE, account),
+            hasRole(NOTARY_ROLE, account),
+            hasRole(IVSL_ROLE, account)
+        );
+    }
+
     function getSignatures(uint256 tokenId) external view returns (address surveyor, address notary, address ivsl) {
         require(ownerOf(tokenId) != address(0), "Token does not exist");
         Signatures memory s = _signatures[tokenId];
