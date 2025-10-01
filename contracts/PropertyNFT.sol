@@ -18,9 +18,9 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
     }
 
     struct Signatures {
-        bool surveyorSigned;
-        bool notarySigned;
-        bool ivslSigned;
+        address surveyor;
+        address notary;
+        address ivsl;
     }
 
     mapping(uint256 => Metadata) private _tokenMetadata;
@@ -42,39 +42,48 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         require(ownerOf(tokenId) != address(0), "Token does not exist");
 
         if (hasRole(SURVEYOR_ROLE, msg.sender)) {
-            require(!_signatures[tokenId].surveyorSigned, "Already signed");
-            _signatures[tokenId].surveyorSigned = true;
+            require(_signatures[tokenId].surveyor == address(0), "Already signed");
+            _signatures[tokenId].surveyor = msg.sender;
+            emit PropertySigned(tokenId, msg.sender, "SURVEYOR");
         } else if (hasRole(NOTARY_ROLE, msg.sender)) {
-            require(!_signatures[tokenId].notarySigned, "Already signed");
-            _signatures[tokenId].notarySigned = true;
+            require(_signatures[tokenId].notary == address(0), "Already signed");
+            _signatures[tokenId].notary = msg.sender;
+            emit PropertySigned(tokenId, msg.sender, "NOTARY");
         } else if (hasRole(IVSL_ROLE, msg.sender)) {
-            require(!_signatures[tokenId].ivslSigned, "Already signed");
-            _signatures[tokenId].ivslSigned = true;
+            require(_signatures[tokenId].ivsl == address(0), "Already signed");
+            _signatures[tokenId].ivsl = msg.sender;
+            emit PropertySigned(tokenId, msg.sender, "IVSL");
         } else {
             revert("Not authorized to sign");
         }
     }
 
+    function getSignatures(uint256 tokenId) external view returns (address surveyor, address notary, address ivsl) {
+        require(ownerOf(tokenId) != address(0), "Token does not exist");
+        Signatures memory s = _signatures[tokenId];
+        return (s.surveyor, s.notary, s.ivsl);
+    }
+
     function isSignedBySurveyor(uint256 tokenId) public view returns (bool) {
         require(ownerOf(tokenId) != address(0), "Token does not exist");
-        return _signatures[tokenId].surveyorSigned;
+        return _signatures[tokenId].surveyor != address(0);
     }
 
     function isSignedByNotary(uint256 tokenId) public view returns (bool) {
         require(ownerOf(tokenId) != address(0), "Token does not exist");
-        return _signatures[tokenId].notarySigned;
+        return _signatures[tokenId].notary != address(0);
     }
 
     function isSignedByIVSL(uint256 tokenId) public view returns (bool) {
         require(ownerOf(tokenId) != address(0), "Token does not exist");
-        return _signatures[tokenId].ivslSigned;
+        return _signatures[tokenId].ivsl != address(0);
     }
 
     function isFullySigned(uint256 tokenId) public view returns (bool) {
         require(ownerOf(tokenId) != address(0), "Token does not exist");
-        return _signatures[tokenId].surveyorSigned &&
-               _signatures[tokenId].notarySigned &&
-               _signatures[tokenId].ivslSigned;
+        return _signatures[tokenId].surveyor != address(0) &&
+               _signatures[tokenId].notary != address(0) &&
+               _signatures[tokenId].ivsl != address(0);
     }
 
     function getMetadata(uint256 tokenId) external view returns (string memory ipfsHash, string memory dbHash) {
