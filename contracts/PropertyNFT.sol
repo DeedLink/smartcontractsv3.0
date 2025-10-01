@@ -26,6 +26,8 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
     mapping(uint256 => Metadata) private _tokenMetadata;
     mapping(uint256 => Signatures) private _signatures;
 
+    event PropertySigned(uint256 indexed tokenId, address indexed signer, string role);
+
     constructor(address initialOwner) ERC721("RealEstateNFT", "RE-NFT") Ownable(initialOwner) {
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
     }
