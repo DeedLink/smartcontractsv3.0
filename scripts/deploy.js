@@ -1,4 +1,6 @@
 const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   const [deployer] = await hre.ethers.getSigners();
@@ -33,7 +35,11 @@ async function main() {
   console.log("EscrowFactory:", escrowFactoryAddress);
 
   console.log("\n=== Saving deployment addresses ===");
-  const fs = require("fs");
+  const deploymentsDir = path.join(__dirname, "..", "deployments");
+  if (!fs.existsSync(deploymentsDir)) {
+    fs.mkdirSync(deploymentsDir, { recursive: true });
+  }
+
   const deploymentInfo = {
     network: hre.network.name,
     deployer: deployer.address,
@@ -45,10 +51,8 @@ async function main() {
     }
   };
 
-  fs.writeFileSync(
-    `./deployments/${hre.network.name}-deployment.json`,
-    JSON.stringify(deploymentInfo, null, 2)
-  );
+  const filePath = path.join(deploymentsDir, `${hre.network.name}-deployment.json`);
+  fs.writeFileSync(filePath, JSON.stringify(deploymentInfo, null, 2));
 
   console.log(`Deployment info saved to ./deployments/${hre.network.name}-deployment.json`);
 
