@@ -23,6 +23,25 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         address ivsl;
     }
 
+    struct RentInfo {
+        uint256 amount;
+        uint256 period;
+        uint256 lastPaid;
+        address receiver;
+    }
+
+    mapping(uint256 => RentInfo) public rentInfo;
+    event RentPaid(uint256 indexed tokenId, address indexed payer, uint256 amount, uint256 timestamp);
+
+    enum PoARights { SIGN, TRANSFER, FRACTIONALIZE, PAY_RENT }
+    struct PoAInfo {
+        bool allowed;
+        uint256 start;
+        uint256 end;
+    }
+    mapping(uint256 => mapping(address => mapping(PoARights => PoAInfo))) public poa;
+    event PoASet(uint256 indexed tokenId, address indexed agent, PoARights right, bool allowed, uint256 start, uint256 end);
+ 
     mapping(uint256 => Metadata) private _tokenMetadata;
     mapping(uint256 => Signatures) private _signatures;
 
@@ -30,6 +49,16 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
 
     constructor(address initialOwner) ERC721("RealEstateNFT", "RE-NFT") Ownable(initialOwner) {
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
+    }
+
+    modifier onlyOwnerOrActiveAgent(uint256 tokenId, PoARights right) {
+        PoAInfo memory agent = poa[tokenId][msg.sender][right];
+        require(
+            msg.sender == ownerOf(tokenId) ||
+            (agent.allowed && block.timestamp >= agent.start && block.timestamp <= agent.end),
+            "Not authorized"
+        );
+        _;
     }
 
     function mintProperty(address to, string memory ipfsHash, string memory dbHash) external {
@@ -107,5 +136,40 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    function setPoA(
+        uint256 tokenId,
+        address agent,
+        PoARights right,
+        bool allowed,
+        uint256 start,
+        uint256 end
+    ) external {
+        require(ownerOf(tokenId) == msg.sender, "Only owner can assign PoA");
+        require(end > start, "Invalid period");
+        poa[tokenId][agent][right] = PoAInfo(allowed, start, end);
+        emit PoASet(tokenId, agent, right, allowed, start, end);
+    }
+
+        function setRent(uint256 tokenId, uint256 amount, uint256 period, address receiver) external {
+        require(ownerOf(tokenId) == msg.sender, "Only owner can set rent");
+        rentInfo[tokenId] = RentInfo(amount, period, block.timestamp, receiver);
+    }
+
+    function payRent(uint256 tokenId) external payable onlyOwnerOrActiveAgent(tokenId, PoARights.PAY_RENT) {
+        RentInfo storage rent = rentInfo[tokenId];
+        require(rent.amount > 0, "Rent not set");
+        require(msg.value == rent.amount, "Incorrect amount");
+        require(block.timestamp >= rent.lastPaid + rent.period, "Payment not due yet");
+
+        rent.lastPaid = block.timestamp;
+        payable(rent.receiver).transfer(msg.value);
+        emit RentPaid(tokenId, msg.sender, msg.value, block.timestamp);
+    }
+
+    function getRentStatus(uint256 tokenId) external view returns (uint256 lastPaid, uint256 amount, uint256 period, address receiver) {
+        RentInfo memory r = rentInfo[tokenId];
+        return (r.lastPaid, r.amount, r.period, r.receiver);
     }
 }
