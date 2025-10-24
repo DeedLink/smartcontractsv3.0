@@ -152,7 +152,7 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         emit PoASet(tokenId, agent, right, allowed, start, end);
     }
 
-        function setRent(uint256 tokenId, uint256 amount, uint256 period, address receiver) external {
+    function setRent(uint256 tokenId, uint256 amount, uint256 period, address receiver) external {
         require(ownerOf(tokenId) == msg.sender, "Only owner can set rent");
         rentInfo[tokenId] = RentInfo(amount, period, block.timestamp, receiver);
     }
