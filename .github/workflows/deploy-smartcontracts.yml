@@ -1,17 +1,12 @@
-name: Deploy Smart Contracts
-
-on:
-  push:
-    branches:
-      - main
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '22'
 
       - name: Set up SSH
         run: |
@@ -40,7 +35,10 @@ jobs:
               cd smartcontracts
             fi
 
-            npm install --legacy-peer-deps
+            curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+            sudo apt-get install -y nodejs
+
+            npm install
             npx hardhat run scripts/deploy.js --network anvil
             sudo systemctl restart anvil || true
           EOF
@@ -50,8 +48,7 @@ jobs:
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: node encryptAddresses.js
 
-      - name: Upload Encrypted File
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: encrypted-deployment
           path: dep.json
