@@ -22,10 +22,13 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_IP }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_IP }} << 'EOF'
             set -e
-            cd /home/ubuntu/deedlink-deployments || mkdir -p /home/ubuntu/deedlink-deployments
-            cd /home/ubuntu/deedlink-deployments
+            DEPLOY_DIR="/home/ubuntu/deedlink-deployments"
+            REPO_URL="https://github.com/DeedLink/smartcontractsv3.0.git"
+
+            mkdir -p "$DEPLOY_DIR"
+            cd "$DEPLOY_DIR"
 
             if [ -d "smartcontracts/.git" ]; then
               cd smartcontracts
@@ -33,7 +36,7 @@ jobs:
               git reset --hard origin/main
             else
               rm -rf smartcontracts
-              git clone https://github.com/DeedLink/smartcontractsv3.0.git smartcontracts
+              git clone "$REPO_URL" smartcontracts
               cd smartcontracts
             fi
 
