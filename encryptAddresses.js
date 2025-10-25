@@ -1,21 +1,73 @@
-const crypto = require('crypto');
-const fs = require('fs');
+// scripts/deploy.js
+import fs from "fs";
+import crypto from "crypto";
+import { ethers } from "hardhat";
 
-const algorithm = 'aes-256-cbc';
-const key = process.env.ENCRYPTION_KEY;
-const iv = crypto.randomBytes(16);
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
-const data = fs.readFileSync('dep.json', 'utf8');
+if (!ENCRYPTION_KEY) {
+  console.error("ENCRYPTION_KEY missing");
+  process.exit(1);
+}
 
-const cipher = crypto.createCipheriv(algorithm, Buffer.from(key, 'hex'), iv);
-let encrypted = cipher.update(data, 'utf8', 'hex');
-encrypted += cipher.final('hex');
+async function main() {
+  const deployedContracts = {};
 
-const encryptedData = {
-  iv: iv.toString('hex'),
-  data: encrypted
-};
+  const EscrowFactory = await ethers.getContractFactory("EscrowFactory");
+  const escrowFactory = await EscrowFactory.deploy();
+  await escrowFactory.deployed();
 
-fs.writeFileSync('dep.json', JSON.stringify(encryptedData));
+  deployedContracts["EscrowFactory"] = myContract.address;
 
-console.log('Encryption complete');
+  const FractionalToken = await ethers.getContractFactory("FractionalToken");
+  const fractionalToken = await FractionalToken.deploy();
+  await fractionalToken.deployed();
+
+  deployedContracts["FractionalToken"] = fractionalToken.address;
+
+  const FractionTokenFactory = await ethers.getContractFactory("FractionTokenFactory");
+  const fractionTokenFactory = await FractionTokenFactory.deploy();
+  await fractionTokenFactory.deployed();
+
+  deployedContracts["FractionTokenFactory"] = fractionTokenFactory.address;
+
+  const HybridEscrow = await ethers.getContractFactory("HybridEscrow");
+  const hybridEscrow = await HybridEscrow.deploy();
+  await hybridEscrow.deployed();
+
+  deployedContracts["HybridEscrow"] = hybridEscrow.address;
+
+  const PropertyNFT = await ethers.getContractFactory("PropertyNFT");
+  const propertyNFT = await PropertyNFT.deploy();
+  await propertyNFT.deployed();
+
+  deployedContracts["PropertyNFT"] = propertyNFT.address;
+
+  const dir = "./runtime";
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir);
+
+  const filePath = `${dir}/dev.json`;
+
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv(
+    "aes-256-cbc",
+    Buffer.from(ENCRYPTION_KEY, "hex"),
+    iv
+  );
+
+  let encrypted = cipher.update(JSON.stringify(deployedContracts), "utf8", "hex");
+  encrypted += cipher.final("hex");
+
+  const encryptedData = {
+    iv: iv.toString("hex"),
+    data: encrypted,
+  };
+
+  fs.writeFileSync(filePath, JSON.stringify(encryptedData, null, 2));
+  console.log("Contracts deployed and encrypted in runtime/dev.json");
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
