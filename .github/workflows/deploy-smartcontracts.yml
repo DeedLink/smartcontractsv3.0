@@ -13,6 +13,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
+          run: nvm use 22
           node-version: '22'
 
       - name: Set up SSH
