@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "DeedNFT Smart Contract Testing",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
