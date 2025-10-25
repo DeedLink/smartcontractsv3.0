@@ -1,0 +1,54 @@
+name: Deploy Smart Contracts
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        run: |
+          ssh -i ~/.ssh/id_rsa ec2-user@${{ secrets.EC2_IP }} << 'EOF'
+            set -e
+            cd /home/ubuntu/deedlink-deployments || mkdir -p /home/ubuntu/deedlink-deployments
+            cd /home/ubuntu/deedlink-deployments
+
+            if [ -d "smartcontracts/.git" ]; then
+              cd smartcontracts
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              rm -rf smartcontracts
+              git clone https://github.com/DeedLink/smartcontractsv3.0.git smartcontracts
+              cd smartcontracts
+            fi
+
+            npm install --legacy-peer-deps
+            npx hardhat run scripts/deploy.js --network anvil
+            sudo systemctl restart anvil || true
+          EOF
+
+      - name: Encrypt Contract Addresses
+        env:
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: node encryptAddresses.js
+
+      - name: Upload Encrypted File
+        uses: actions/upload-artifact@v4
+        with:
+          name: encrypted-deployment
+          path: dep.json
