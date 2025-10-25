@@ -42,14 +42,11 @@ jobs:
               cd smartcontracts
             fi
 
+            > anvil.log
+            nohup anvil --host 0.0.0.0 --port 8545 --chain-id 13337 > anvil.log 2>&1 &
+
+            sleep 10
+
             yarn
             yarn deploy:anvil
-            sudo systemctl restart anvil || true
-
-            git config user.name "DeedLink Bot"
-            git config user.email "bot@deedlink.com"
-
-            git add deployments/anvil-deployment.json
-            git commit -m "Update deployment info after automated deploy"
-            git push https://${{ secrets.GITHUB_TOKEN }}@github.com/DeedLink/smartcontractsv3.0.git HEAD:main
           EOF
