@@ -13,7 +13,6 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          run: nvm use 22
           node-version: '22'
 
       - name: Set up SSH
@@ -46,8 +45,8 @@ jobs:
             curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
             sudo apt-get install -y nodejs
 
-            npm install
-            npx hardhat run scripts/deploy.js --network anvil
+            yarn
+            yarn deploy:anvil
             sudo systemctl restart anvil || true
           EOF
 
