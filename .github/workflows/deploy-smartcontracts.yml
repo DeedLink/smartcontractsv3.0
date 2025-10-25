@@ -28,7 +28,7 @@ jobs:
             set -e
             DEPLOY_DIR="/home/ubuntu/deedlink-deployments"
             REPO_URL="https://github.com/DeedLink/smartcontractsv3.0.git"
-
+            
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
 
@@ -42,20 +42,14 @@ jobs:
               cd smartcontracts
             fi
 
-            curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-            sudo apt-get install -y nodejs
-
             yarn
             yarn deploy:anvil
             sudo systemctl restart anvil || true
+
+            git config user.name "DeedLink Bot"
+            git config user.email "bot@deedlink.com"
+
+            git add deployments/anvil-deployment.json
+            git commit -m "Update deployment info after automated deploy"
+            git push https://${{ secrets.GITHUB_TOKEN }}@github.com/DeedLink/smartcontractsv3.0.git HEAD:main
           EOF
-
-      - name: Encrypt Contract Addresses
-        env:
-          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-        run: node encryptAddresses.js
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: encrypted-deployment
-          path: dep.json
