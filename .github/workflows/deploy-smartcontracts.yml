@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
 
@@ -26,8 +27,21 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_IP }} << 'EOF'
             set -e
+
             DEPLOY_DIR="/home/ubuntu/deedlink-deployments"
             REPO_URL="https://github.com/DeedLink/smartcontractsv3.0.git"
+
+            # Make sure environment is ready
+            export PATH="$HOME/.foundry/bin:$PATH"
+            echo "✅ PATH: $PATH"
+
+            # Ensure anvil exists
+            if ! command -v anvil &> /dev/null; then
+              echo "⚙️ Installing Foundry (includes Anvil)..."
+              curl -L https://foundry.paradigm.xyz | bash
+              source ~/.bashrc
+              foundryup
+            fi
 
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
@@ -48,7 +62,7 @@ jobs:
             pkill anvil || true
 
             echo "🚀 Starting Anvil..."
-            nohup anvil --host 0.0.0.0 --port 8545 --chain-id 13337 --cors "*" > anvil.log 2>&1 &
+            nohup "$HOME/.foundry/bin/anvil" --host 0.0.0.0 --port 8545 --chain-id 13337 --cors "*" > anvil.log 2>&1 &
 
             echo "⏳ Waiting for Anvil to start..."
             for i in {1..45}; do
