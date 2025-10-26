@@ -45,6 +45,7 @@ jobs:
             cd ~
             > anvil.log
             rm -f anvil-state.json
+            pkill anvil
             nohup anvil --host 0.0.0.0 --port 8545 --chain-id 13337 --cors "*" > anvil.log 2>&1 &
 
             sleep 10
