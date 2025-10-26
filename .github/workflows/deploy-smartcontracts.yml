@@ -48,7 +48,14 @@ jobs:
             pkill anvil
             nohup anvil --host 0.0.0.0 --port 8545 --chain-id 13337 --cors "*" > anvil.log 2>&1 &
 
-            sleep 10
+            echo "Waiting for Anvil to start..."
+            for i in {1..30}; do
+              if nc -z 127.0.0.1 8545; then
+                echo "Anvil is running!"
+                break
+              fi
+              sleep 1
+            done
 
             cd "$DEPLOY_DIR"
             cd smartcontracts
