@@ -31,11 +31,11 @@ jobs:
             DEPLOY_DIR="/home/ubuntu/deedlink-deployments"
             REPO_URL="https://github.com/DeedLink/smartcontractsv3.0.git"
 
-            # Make sure environment is ready
+            # Ensure PATH includes Foundry binaries
             export PATH="$HOME/.foundry/bin:$PATH"
             echo "✅ PATH: $PATH"
 
-            # Ensure anvil exists
+            # Ensure Anvil is installed
             if ! command -v anvil &> /dev/null; then
               echo "⚙️ Installing Foundry (includes Anvil)..."
               curl -L https://foundry.paradigm.xyz | bash
@@ -62,7 +62,11 @@ jobs:
             pkill anvil || true
 
             echo "🚀 Starting Anvil..."
-            nohup "$HOME/.foundry/bin/anvil" --host 0.0.0.0 --port 8545 --chain-id 13337 --cors "*" > anvil.log 2>&1 &
+            nohup "$HOME/.foundry/bin/anvil" \
+              --host 0.0.0.0 \
+              --port 8545 \
+              --chain-id 13337 \
+              > anvil.log 2>&1 &
 
             echo "⏳ Waiting for Anvil to start..."
             for i in {1..45}; do
