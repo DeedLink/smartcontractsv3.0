@@ -28,7 +28,7 @@ jobs:
             set -e
             DEPLOY_DIR="/home/ubuntu/deedlink-deployments"
             REPO_URL="https://github.com/DeedLink/smartcontractsv3.0.git"
-            
+
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
 
@@ -44,21 +44,28 @@ jobs:
 
             cd ~
             > anvil.log
-            rm -f anvil-state.json
-            pkill anvil
+            rm -f anvil-state.json || true
+            pkill anvil || true
+
+            echo "🚀 Starting Anvil..."
             nohup anvil --host 0.0.0.0 --port 8545 --chain-id 13337 --cors "*" > anvil.log 2>&1 &
 
-            echo "Waiting for Anvil to start..."
-            for i in {1..30}; do
+            echo "⏳ Waiting for Anvil to start..."
+            for i in {1..45}; do
               if nc -z 127.0.0.1 8545; then
-                echo "Anvil is running!"
+                echo "✅ Anvil is running!"
                 break
               fi
               sleep 1
             done
 
-            cd "$DEPLOY_DIR"
-            cd smartcontracts
+            if ! nc -z 127.0.0.1 8545; then
+              echo "❌ Anvil did not start in time. Printing logs..."
+              cat anvil.log
+              exit 1
+            fi
+
+            cd "$DEPLOY_DIR/smartcontracts"
 
             yarn
             yarn deploy:anvil
