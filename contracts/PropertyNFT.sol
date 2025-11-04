@@ -168,6 +168,21 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         emit RentPaid(tokenId, msg.sender, msg.value, block.timestamp);
     }
 
+    function isRentActive(uint256 tokenId) public view returns (bool) {
+        RentInfo memory rent = rentInfo[tokenId];
+        if (rent.amount == 0 || rent.receiver == address(0)) {
+            return false;
+        }
+        return block.timestamp < rent.lastPaid + rent.period;
+    }
+
+    function endRent(uint256 tokenId) external {
+        require(ownerOf(tokenId) == msg.sender, "Only owner can end rent");
+        rentInfo[tokenId].amount = 0;
+        rentInfo[tokenId].period = 0;
+        rentInfo[tokenId].receiver = address(0);
+    }
+
     function getRentStatus(uint256 tokenId) external view returns (uint256 lastPaid, uint256 amount, uint256 period, address receiver) {
         RentInfo memory r = rentInfo[tokenId];
         return (r.lastPaid, r.amount, r.period, r.receiver);
