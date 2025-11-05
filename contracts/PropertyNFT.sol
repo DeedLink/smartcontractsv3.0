@@ -30,22 +30,22 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         address receiver;
     }
 
-    mapping(uint256 => RentInfo) public rentInfo;
-    event RentPaid(uint256 indexed tokenId, address indexed payer, uint256 amount, uint256 timestamp);
-
     enum PoARights { SIGN, TRANSFER, FRACTIONALIZE, PAY_RENT }
+
     struct PoAInfo {
         bool allowed;
         uint256 start;
         uint256 end;
     }
-    mapping(uint256 => mapping(address => mapping(PoARights => PoAInfo))) public poa;
-    event PoASet(uint256 indexed tokenId, address indexed agent, PoARights right, bool allowed, uint256 start, uint256 end);
- 
+
     mapping(uint256 => Metadata) private _tokenMetadata;
     mapping(uint256 => Signatures) private _signatures;
+    mapping(uint256 => RentInfo) public rentInfo;
+    mapping(uint256 => mapping(address => mapping(PoARights => PoAInfo))) public poa;
 
     event PropertySigned(uint256 indexed tokenId, address indexed signer, string role);
+    event PoASet(uint256 indexed tokenId, address indexed agent, PoARights right, bool allowed, uint256 start, uint256 end);
+    event RentPaid(uint256 indexed tokenId, address indexed payer, uint256 amount, uint256 timestamp);
 
     constructor(address initialOwner) ERC721("RealEstateNFT", "RE-NFT") Ownable(initialOwner) {
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
@@ -54,11 +54,15 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
     modifier onlyOwnerOrActiveAgent(uint256 tokenId, PoARights right) {
         PoAInfo memory agent = poa[tokenId][msg.sender][right];
         require(
-            msg.sender == ownerOf(tokenId) ||
-            (agent.allowed && block.timestamp >= agent.start && block.timestamp <= agent.end),
+            _isAuthorized(tokenId, right, agent),
             "Not authorized"
         );
         _;
+    }
+
+    function _isAuthorized(uint256 tokenId, PoARights right, PoAInfo memory agent) internal view returns (bool) {
+        return (msg.sender == ownerOf(tokenId) ||
+            (agent.allowed && block.timestamp >= agent.start && block.timestamp <= agent.end));
     }
 
     function mintProperty(address to, string memory ipfsHash, string memory dbHash) external {
@@ -68,7 +72,7 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
     }
 
     function signProperty(uint256 tokenId) external {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
 
         if (hasRole(SURVEYOR_ROLE, msg.sender)) {
             require(_signatures[tokenId].surveyor == address(0), "Already signed");
@@ -87,7 +91,7 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         }
     }
 
-    function getRolesOf(address account) external view returns (bool surveyor, bool notary, bool ivsl) {
+    function getRolesOf(address account) external view returns (bool, bool, bool) {
         return (
             hasRole(SURVEYOR_ROLE, account),
             hasRole(NOTARY_ROLE, account),
@@ -95,47 +99,38 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         );
     }
 
-    function getSignatures(uint256 tokenId) external view returns (address surveyor, address notary, address ivsl) {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
+    function getSignatures(uint256 tokenId) external view returns (address, address, address) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
         Signatures memory s = _signatures[tokenId];
         return (s.surveyor, s.notary, s.ivsl);
     }
 
     function isSignedBySurveyor(uint256 tokenId) public view returns (bool) {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
         return _signatures[tokenId].surveyor != address(0);
     }
 
     function isSignedByNotary(uint256 tokenId) public view returns (bool) {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
         return _signatures[tokenId].notary != address(0);
     }
 
     function isSignedByIVSL(uint256 tokenId) public view returns (bool) {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
         return _signatures[tokenId].ivsl != address(0);
     }
 
     function isFullySigned(uint256 tokenId) public view returns (bool) {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
         return _signatures[tokenId].surveyor != address(0) &&
                _signatures[tokenId].notary != address(0) &&
                _signatures[tokenId].ivsl != address(0);
     }
 
-    function getMetadata(uint256 tokenId) external view returns (string memory ipfsHash, string memory dbHash) {
-        require(ownerOf(tokenId) != address(0), "Token does not exist");
+    function getMetadata(uint256 tokenId) external view returns (string memory, string memory) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
         Metadata memory metadata = _tokenMetadata[tokenId];
         return (metadata.ipfsHash, metadata.dbHash);
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, AccessControl)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
     }
 
     function setPoA(
@@ -170,21 +165,24 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
 
     function isRentActive(uint256 tokenId) public view returns (bool) {
         RentInfo memory rent = rentInfo[tokenId];
-        if (rent.amount == 0 || rent.receiver == address(0)) {
-            return false;
-        }
         return block.timestamp < rent.lastPaid + rent.period;
     }
 
-    function endRent(uint256 tokenId) external {
-        require(ownerOf(tokenId) == msg.sender, "Only owner can end rent");
-        rentInfo[tokenId].amount = 0;
-        rentInfo[tokenId].period = 0;
-        rentInfo[tokenId].receiver = address(0);
+    function _update(address to, uint256 tokenId, address auth)
+        internal
+        override
+        returns (address)
+    {
+        require(!isRentActive(tokenId), "Cannot transfer while rent is active");
+        return super._update(to, tokenId, auth);
     }
 
-    function getRentStatus(uint256 tokenId) external view returns (uint256 lastPaid, uint256 amount, uint256 period, address receiver) {
-        RentInfo memory r = rentInfo[tokenId];
-        return (r.lastPaid, r.amount, r.period, r.receiver);
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, AccessControl)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
     }
 }
