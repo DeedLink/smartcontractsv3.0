@@ -173,7 +173,8 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         override
         returns (address)
     {
-        require(!isRentActive(tokenId), "Cannot transfer while rent is active");
+        //require(!isRentActive(tokenId), "Cannot transfer while rent is active");
+        require(isFullySigned(tokenId), "Property must be fully signed before transfer");
         return super._update(to, tokenId, auth);
     }
 
