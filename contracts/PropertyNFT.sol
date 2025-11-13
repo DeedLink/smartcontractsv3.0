@@ -38,14 +38,28 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         uint256 end;
     }
 
+    struct LastWill {
+        address beneficiary;
+        address notary;
+        uint256 propertyValue;
+        uint256 govFee;
+        uint256 timestamp;
+        bool approved;
+        bool executed;
+    }
+
     mapping(uint256 => Metadata) private _tokenMetadata;
     mapping(uint256 => Signatures) private _signatures;
     mapping(uint256 => RentInfo) public rentInfo;
     mapping(uint256 => mapping(address => mapping(PoARights => PoAInfo))) public poa;
+    mapping(uint256 => LastWill) public lastWill;
 
     event PropertySigned(uint256 indexed tokenId, address indexed signer, string role);
     event PoASet(uint256 indexed tokenId, address indexed agent, PoARights right, bool allowed, uint256 start, uint256 end);
     event RentPaid(uint256 indexed tokenId, address indexed payer, uint256 amount, uint256 timestamp);
+    event LastWillSet(uint256 indexed tokenId, address indexed owner, address indexed beneficiary, address notary, uint256 value, uint256 govFee);
+    event LastWillApproved(uint256 indexed tokenId, address indexed notary);
+    event LastWillExecuted(uint256 indexed tokenId, address indexed beneficiary);
 
     constructor(address initialOwner) ERC721("RealEstateNFT", "RE-NFT") Ownable(initialOwner) {
         _grantRole(DEFAULT_ADMIN_ROLE, initialOwner);
@@ -167,6 +181,54 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
         RentInfo memory rent = rentInfo[tokenId];
         return block.timestamp < rent.lastPaid + rent.period;
     }
+
+    function setLastWill(
+        uint256 tokenId,
+        address beneficiary,
+        address notary,
+        uint256 propertyValue
+    ) external payable {
+        require(ownerOf(tokenId) == msg.sender, "Only owner can set last will");
+        require(beneficiary != address(0), "Invalid beneficiary");
+        require(hasRole(NOTARY_ROLE, notary), "Notary must have NOTARY_ROLE");
+
+        uint256 stampDuty = (propertyValue * 3) / 100; // 3%
+        uint256 govFee = stampDuty + 500;
+        require(msg.value >= govFee, "Insufficient government fee");
+
+        LastWill storage lw = lastWill[tokenId];
+        lw.beneficiary = beneficiary;
+        lw.notary = notary;
+        lw.propertyValue = propertyValue;
+        lw.govFee = govFee;
+        lw.timestamp = block.timestamp;
+        lw.approved = false;
+        lw.executed = false;
+
+        emit LastWillSet(tokenId, msg.sender, beneficiary, notary, propertyValue, govFee);
+    }
+
+    function approveLastWill(uint256 tokenId) external {
+        LastWill storage lw = lastWill[tokenId];
+        require(hasRole(NOTARY_ROLE, msg.sender), "Only notary can approve");
+        require(lw.notary == msg.sender, "Not assigned notary");
+        require(!lw.approved, "Already approved");
+        lw.approved = true;
+        emit LastWillApproved(tokenId, msg.sender);
+    }
+
+    function executeLastWill(uint256 tokenId) external {
+        LastWill storage lw = lastWill[tokenId];
+        require(lw.approved, "Last will not approved");
+        require(!lw.executed, "Already executed");
+        require(ownerOf(tokenId) != lw.beneficiary, "Already transferred");
+
+        lw.executed = true;
+        _transfer(ownerOf(tokenId), lw.beneficiary, tokenId);
+
+        emit LastWillExecuted(tokenId, lw.beneficiary);
+    }
+
 
     function _update(address to, uint256 tokenId, address auth) internal virtual override returns (address) {
         address from = _ownerOf(tokenId);
