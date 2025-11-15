@@ -54,13 +54,13 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
     modifier onlyOwnerOrActiveAgent(uint256 tokenId, PoARights right) {
         PoAInfo memory agent = poa[tokenId][msg.sender][right];
         require(
-            _isAuthorized(tokenId, right, agent),
+            _isAuthorized(tokenId, agent),
             "Not authorized"
         );
         _;
     }
 
-    function _isAuthorized(uint256 tokenId, PoARights /* right */, PoAInfo memory agent) internal view returns (bool) {
+    function _isAuthorized(uint256 tokenId, PoAInfo memory agent) internal view returns (bool) {
         return (msg.sender == ownerOf(tokenId) ||
             (agent.allowed && block.timestamp >= agent.start && block.timestamp <= agent.end));
     }
@@ -171,7 +171,6 @@ contract PropertyNFT is ERC721, Ownable, AccessControl {
     function _update(address to, uint256 tokenId, address auth) internal virtual override returns (address) {
         address from = _ownerOf(tokenId);
         
-        // Only check signature requirement if it's an actual transfer (not minting)
         if (from != address(0)) {
             require(isFullySigned(tokenId), "Property must be fully signed before transfer");
         }

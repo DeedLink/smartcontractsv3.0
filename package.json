@@ -12,7 +12,13 @@
     "coverage": "hardhat coverage",
     "deploy:anvil": "hardhat run scripts/deploy.js --network anvil",
     "deploy:ganache": "hardhat run scripts/deploy.js --network ganache",
-    "deploy:localhost": "hardhat run scripts/deploy.js --network localhost"
+    "deploy:localhost": "hardhat run scripts/deploy.js --network localhost",
+    "test:property": "hardhat test test/PropertyNFT.test.js --network anvil",
+    "test:fraction": "hardhat test test/FractionTokenFactory.test.js --network anvil",
+    "test:escrow": "hardhat test test/Escrow.test.js --network anvil",
+    "test:stamp": "hardhat test test/StampFeeCollector.test.js --network anvil",
+    "test:will": "hardhat test test/LastWillRegistry.test.js --network anvil",
+    "test:integration": "hardhat test test/Integration.test.js --network anvil"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",

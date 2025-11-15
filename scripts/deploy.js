@@ -4,10 +4,10 @@ const path = require("path");
 
 async function main() {
   const signers = await ethers.getSigners();
-  if (signers.length < 6) {
-    throw new Error(`Not enough signers: got ${signers.length}, need at least 6. Check your Hardhat config.`);
+  if (signers.length < 8) {
+    throw new Error(`Not enough signers: got ${signers.length}, need at least 8. Check your Hardhat config.`);
   }
-  const [deployer, surveyor, notary, ivsl, buyer, seller] = signers;
+  const [deployer, surveyor, notary, ivsl, buyer, seller, witness1, witness2] = signers;
 
   console.log("Deploying contracts with account:", deployer.address);
 
@@ -71,17 +71,71 @@ async function main() {
   const escrowFactoryAddress = await escrowFactory.getAddress();
   console.log("EscrowFactory deployed to:", escrowFactoryAddress);
 
+  console.log("\n=== Deploying StampFeeCollector ===");
+  const StampFeeCollector = await ethers.getContractFactory("StampFeeCollector");
+  const stampFeeCollector = await StampFeeCollector.deploy(deployer.address);
+  await stampFeeCollector.waitForDeployment();
+  const stampFeeCollectorAddress = await stampFeeCollector.getAddress();
+  console.log("StampFeeCollector deployed to:", stampFeeCollectorAddress);
+
+  console.log("\n=== Deploying LastWillRegistry ===");
+  const LastWillRegistry = await ethers.getContractFactory("LastWillRegistry");
+  const lastWillRegistry = await LastWillRegistry.deploy(propertyNFTAddress, deployer.address);
+  await lastWillRegistry.waitForDeployment();
+  const lastWillRegistryAddress = await lastWillRegistry.getAddress();
+  console.log("LastWillRegistry deployed to:", lastWillRegistryAddress);
+
+  await lastWillRegistry.setExecutorAuthorization(deployer.address, true);
+  console.log("Deployer authorized as will executor");
+
+  console.log("\n=== Creating Example Last Will ===");
+  const mintTx2 = await propertyNFT.mintProperty(seller.address, "ipfs://property2", "db://property2");
+  await mintTx2.wait();
+  console.log("Second property NFT minted to seller with tokenId 1");
+
+  await (await propertyNFT.connect(surveyor).signProperty(1)).wait();
+  await (await propertyNFT.connect(notary).signProperty(1)).wait();
+  await (await propertyNFT.connect(ivsl).signProperty(1)).wait();
+  console.log("Second property NFT fully signed");
+
+  const willTx = await lastWillRegistry.connect(seller).createWill(
+    1,
+    buyer.address,
+    witness1.address,
+    witness2.address,
+    "ipfs://will-document-hash-123"
+  );
+  await willTx.wait();
+  console.log("Last Will created for tokenId 1:");
+  console.log("  - Beneficiary:", buyer.address);
+  console.log("  - Witness 1:", witness1.address);
+  console.log("  - Witness 2:", witness2.address);
+
+  await (await lastWillRegistry.connect(witness1).witnessWill(1, true)).wait();
+  console.log("Witness 1 approved the will");
+  
+  await (await lastWillRegistry.connect(witness2).witnessWill(1, true)).wait();
+  console.log("Witness 2 approved the will");
+
+  const isReady = await lastWillRegistry.isWillReadyForExecution(1);
+  console.log("Will ready for execution:", isReady);
+
   console.log("\n=== Deployment Summary ===");
   console.log("PropertyNFT:", propertyNFTAddress);
   console.log("FractionTokenFactory:", factoryAddress);
   console.log("Fractional Token:", fractionTokenAddress);
   console.log("EscrowFactory:", escrowFactoryAddress);
+  console.log("StampFeeCollector:", stampFeeCollectorAddress);
+  console.log("LastWillRegistry:", lastWillRegistryAddress);
+  console.log("\nAccounts:");
   console.log("Deployer:", deployer.address);
   console.log("Surveyor:", surveyor.address);
   console.log("Notary:", notary.address);
   console.log("IVSL:", ivsl.address);
   console.log("Buyer:", buyer.address);
   console.log("Seller:", seller.address);
+  console.log("Witness 1:", witness1.address);
+  console.log("Witness 2:", witness2.address);
 
   console.log("\n=== Saving deployment addresses ===");
   const deploymentsDir = path.join(__dirname, "..", "deployments");
@@ -97,7 +151,9 @@ async function main() {
       PropertyNFT: propertyNFTAddress,
       FractionTokenFactory: factoryAddress,
       FractionalToken: fractionTokenAddress,
-      EscrowFactory: escrowFactoryAddress
+      EscrowFactory: escrowFactoryAddress,
+      StampFeeCollector: stampFeeCollectorAddress,
+      LastWillRegistry: lastWillRegistryAddress
     },
     accounts: {
       deployer: deployer.address,
@@ -105,7 +161,9 @@ async function main() {
       notary: notary.address,
       ivsl: ivsl.address,
       buyer: buyer.address,
-      seller: seller.address
+      seller: seller.address,
+      witness1: witness1.address,
+      witness2: witness2.address
     }
   };
 

@@ -10,6 +10,7 @@ contract HybridEscrow is ReentrancyGuard {
 
     address public buyer;
     address public seller;
+    address public factory;
     uint256 public price;
     bool public isBuyerDeposited;
     bool public isSellerDeposited;
@@ -37,6 +38,7 @@ contract HybridEscrow is ReentrancyGuard {
     ) {
         buyer = _buyer;
         seller = _seller;
+        factory = msg.sender;
         price = _price;
         escrowType = _type;
         propertyNFT = IERC721(_propertyNFT);
@@ -47,7 +49,7 @@ contract HybridEscrow is ReentrancyGuard {
         address _fractionToken,
         uint256 _fractionAmount
     ) external {
-        require(msg.sender == seller, "Only seller can initialize");
+        require(msg.sender == seller || msg.sender == factory, "Not authorized");
         require(escrowType == EscrowType.FRACTIONAL, "Wrong escrow type");
         require(address(fractionToken) == address(0), "Already initialized");
         

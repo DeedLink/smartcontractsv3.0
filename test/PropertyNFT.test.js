@@ -1,286 +1,244 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("Smart Contract Integration Tests", function () {
-    let deployer, surveyor, notary, ivsl, buyer, seller, agent;
-    let propertyNFT, fractionFactory, escrow, fractionTokenAddress;
-    let propertyNFTAddress, fractionFactoryAddress, escrowAddress;
-    let SURVEYOR_ROLE, NOTARY_ROLE, IVSL_ROLE;
+describe("PropertyNFT", function () {
+  let propertyNFT;
+  let owner, surveyor, notary, ivsl, user1, user2, agent;
 
+  beforeEach(async function () {
+    [owner, surveyor, notary, ivsl, user1, user2, agent] = await ethers.getSigners();
+
+    const PropertyNFT = await ethers.getContractFactory("PropertyNFT");
+    propertyNFT = await PropertyNFT.deploy(owner.address);
+    await propertyNFT.waitForDeployment();
+
+    const SURVEYOR_ROLE = await propertyNFT.SURVEYOR_ROLE();
+    const NOTARY_ROLE = await propertyNFT.NOTARY_ROLE();
+    const IVSL_ROLE = await propertyNFT.IVSL_ROLE();
+
+    await propertyNFT.grantRole(SURVEYOR_ROLE, surveyor.address);
+    await propertyNFT.grantRole(NOTARY_ROLE, notary.address);
+    await propertyNFT.grantRole(IVSL_ROLE, ivsl.address);
+  });
+
+  describe("Minting", function () {
+    it("Should mint a new property", async function () {
+      await propertyNFT.mintProperty(user1.address, "ipfs://test", "db://test");
+      expect(await propertyNFT.ownerOf(0)).to.equal(user1.address);
+    });
+
+    it("Should increment tokenId", async function () {
+      await propertyNFT.mintProperty(user1.address, "ipfs://test1", "db://test1");
+      await propertyNFT.mintProperty(user2.address, "ipfs://test2", "db://test2");
+      expect(await propertyNFT.nextTokenId()).to.equal(2);
+    });
+
+    it("Should store metadata correctly", async function () {
+      await propertyNFT.mintProperty(user1.address, "ipfs://test", "db://test");
+      const [ipfsHash, dbHash] = await propertyNFT.getMetadata(0);
+      expect(ipfsHash).to.equal("ipfs://test");
+      expect(dbHash).to.equal("db://test");
+    });
+  });
+
+  describe("Signing", function () {
     beforeEach(async function () {
-        [deployer, surveyor, notary, ivsl, buyer, seller, agent] = await ethers.getSigners();
-
-        // Deploy PropertyNFT
-        const PropertyNFT = await ethers.getContractFactory("PropertyNFT");
-        propertyNFT = await PropertyNFT.deploy(deployer.address);
-        propertyNFTAddress = propertyNFT.target ? propertyNFT.target : propertyNFT.address;
-
-        // Get role hashes
-        SURVEYOR_ROLE = ethers.keccak256(ethers.toUtf8Bytes("SURVEYOR_ROLE"));
-        NOTARY_ROLE = ethers.keccak256(ethers.toUtf8Bytes("NOTARY_ROLE"));
-        IVSL_ROLE = ethers.keccak256(ethers.toUtf8Bytes("IVSL_ROLE"));
-
-        // Grant roles
-        await propertyNFT.grantRole(SURVEYOR_ROLE, surveyor.address);
-        await propertyNFT.grantRole(NOTARY_ROLE, notary.address);
-        await propertyNFT.grantRole(IVSL_ROLE, ivsl.address);
-
-        // Mint property NFT
-        await propertyNFT.mintProperty(seller.address, "ipfs://property1", "db://property1");
-
-        // Deploy FractionTokenFactory
-        const FractionTokenFactory = await ethers.getContractFactory("FractionTokenFactory");
-        fractionFactory = await FractionTokenFactory.deploy();
-        fractionFactoryAddress = fractionFactory.target ? fractionFactory.target : fractionFactory.address;
-
-        // Deploy HybridEscrow
-        const HybridEscrow = await ethers.getContractFactory("HybridEscrow");
-        escrow = await HybridEscrow.deploy(
-            buyer.address,
-            seller.address,
-            ethers.parseEther("1"),
-            0, // NFT
-            propertyNFTAddress,
-            0
-        );
-        escrowAddress = escrow.target ? escrow.target : escrow.address;
+      await propertyNFT.mintProperty(user1.address, "ipfs://test", "db://test");
     });
 
-    describe("PropertyNFT", function () {
-        describe("Role Management", function () {
-            it("should have correct role assignments", async function () {
-                expect(await propertyNFT.hasRole(SURVEYOR_ROLE, surveyor.address)).to.be.true;
-                expect(await propertyNFT.hasRole(NOTARY_ROLE, notary.address)).to.be.true;
-                expect(await propertyNFT.hasRole(IVSL_ROLE, ivsl.address)).to.be.true;
-            });
-
-            it("should prevent unauthorized role assignments", async function () {
-                await expect(
-                    propertyNFT.connect(seller).grantRole(SURVEYOR_ROLE, buyer.address)
-                ).to.be.reverted;
-            });
-        });
-
-        describe("Property Management", function () {
-            it("should mint with correct metadata", async function () {
-                const [ipfsHash, dbHash] = await propertyNFT.getMetadata(0);
-                expect(ipfsHash).to.equal("ipfs://property1");
-                expect(dbHash).to.equal("db://property1");
-            });
-
-            it("should track token IDs correctly", async function () {
-                const nextId = await propertyNFT.nextTokenId();
-                expect(nextId).to.equal(1);
-            });
-
-            it("should assign correct ownership", async function () {
-                expect(await propertyNFT.ownerOf(0)).to.equal(seller.address);
-            });
-        });
-
-        describe("Property Signing", function () {
-            it("should track individual signatures", async function () {
-                await propertyNFT.connect(surveyor).signProperty(0);
-                expect(await propertyNFT.isSignedBySurveyor(0)).to.be.true;
-                expect(await propertyNFT.isSignedByNotary(0)).to.be.false;
-                expect(await propertyNFT.isSignedByIVSL(0)).to.be.false;
-            });
-
-            it("should prevent double signing", async function () {
-                await propertyNFT.connect(surveyor).signProperty(0);
-                await expect(
-                    propertyNFT.connect(surveyor).signProperty(0)
-                ).to.be.revertedWith("Already signed");
-            });
-
-            it("should update fully signed status correctly", async function () {
-                await propertyNFT.connect(surveyor).signProperty(0);
-                await propertyNFT.connect(notary).signProperty(0);
-                await propertyNFT.connect(ivsl).signProperty(0);
-                expect(await propertyNFT.isFullySigned(0)).to.be.true;
-            });
-
-            it("should prevent unauthorized signing", async function () {
-                await expect(
-                    propertyNFT.connect(buyer).signProperty(0)
-                ).to.be.revertedWith("Not authorized to sign");
-            });
-        });
-
-        describe("Power of Attorney (PoA)", function () {
-            it("should set PoA correctly", async function () {
-                const start = (await ethers.provider.getBlock("latest")).timestamp;
-                const end = start + 3600; // 1 hour
-
-                await propertyNFT.connect(seller).setPoA(
-                    0,
-                    agent.address,
-                    0, // SIGN
-                    true,
-                    start,
-                    end
-                );
-
-                const poaInfo = await propertyNFT.poa(0, agent.address, 0);
-                expect(poaInfo.allowed).to.be.true;
-            });
-
-            it("should allow agent to sign within PoA period", async function () {
-                const start = (await ethers.provider.getBlock("latest")).timestamp;
-                const end = start + 3600;
-
-                await propertyNFT.connect(seller).setPoA(0, agent.address, 0, true, start, end);
-
-                await propertyNFT.connect(agent).signProperty(0);
-                expect(await propertyNFT.isSignedBySurveyor(0)).to.be.false; // agent is not SURVEYOR
-            });
-        });
-
-        describe("Rent", function () {
-            it("should allow setting rent by owner", async function () {
-                await propertyNFT.connect(seller).setRent(0, ethers.parseEther("0.1"), 3600, seller.address);
-                const rentStatus = await propertyNFT.getRentStatus(0);
-                expect(rentStatus.amount).to.equal(ethers.parseEther("0.1"));
-                expect(rentStatus.period).to.equal(3600);
-                expect(rentStatus.receiver).to.equal(seller.address);
-            });
-
-            it("should allow paying rent with PoA agent", async function () {
-                await propertyNFT.connect(seller).setRent(0, ethers.parseEther("0.1"), 0, seller.address);
-                const start = (await ethers.provider.getBlock("latest")).timestamp;
-                const end = start + 3600;
-
-                await propertyNFT.connect(seller).setPoA(0, agent.address, 3, true, start, end); // PAY_RENT = 3
-                await propertyNFT.connect(agent).payRent(0, { value: ethers.parseEther("0.1") });
-
-                const rentStatus = await propertyNFT.getRentStatus(0);
-                expect(rentStatus.lastPaid).to.be.greaterThan(0);
-            });
-        });
+    it("Should allow surveyor to sign", async function () {
+      await expect(propertyNFT.connect(surveyor).signProperty(0))
+        .to.emit(propertyNFT, "PropertySigned")
+        .withArgs(0, surveyor.address, "SURVEYOR");
+      
+      expect(await propertyNFT.isSignedBySurveyor(0)).to.be.true;
     });
 
-    describe("FractionTokenFactory", function () {
-        beforeEach(async function () {
-            await propertyNFT.connect(surveyor).signProperty(0);
-            await propertyNFT.connect(notary).signProperty(0);
-            await propertyNFT.connect(ivsl).signProperty(0);
-        });
-
-        it("should create fraction token with correct parameters", async function () {
-            const tx = await fractionFactory.createFractionToken(
-                0,
-                "PropertyToken",
-                "PTKN",
-                ethers.parseUnits("1000", 18),
-                propertyNFTAddress
-            );
-            await tx.wait();
-
-            fractionTokenAddress = await fractionFactory.propertyToFractionToken(0);
-            const FractionalToken = await ethers.getContractFactory("FractionalToken");
-            const fractionToken = FractionalToken.attach(fractionTokenAddress);
-
-            expect(await fractionToken.name()).to.equal("PropertyToken");
-            expect(await fractionToken.symbol()).to.equal("PTKN");
-            expect(await fractionToken.propertyId()).to.equal(0);
-        });
-
-        it("should prevent creating tokens for non-existent NFTs", async function () {
-            await expect(
-                fractionFactory.createFractionToken(
-                    999,
-                    "Invalid",
-                    "INV",
-                    ethers.parseUnits("1000", 18),
-                    propertyNFTAddress
-                )
-            ).to.be.revertedWith("Property does not exist");
-        });
-
-        it("should prevent duplicate token creation", async function () {
-            await fractionFactory.createFractionToken(
-                0,
-                "PropertyToken",
-                "PTKN",
-                ethers.parseUnits("1000", 18),
-                propertyNFTAddress
-            );
-
-            await expect(
-                fractionFactory.createFractionToken(
-                    0,
-                    "PropertyToken2",
-                    "PTKN2",
-                    ethers.parseUnits("1000", 18),
-                    propertyNFTAddress
-                )
-            ).to.be.revertedWith("Fraction token already exists");
-        });
+    it("Should allow notary to sign", async function () {
+      await expect(propertyNFT.connect(notary).signProperty(0))
+        .to.emit(propertyNFT, "PropertySigned")
+        .withArgs(0, notary.address, "NOTARY");
+      
+      expect(await propertyNFT.isSignedByNotary(0)).to.be.true;
     });
 
-    describe("HybridEscrow", function () {
-        beforeEach(async function () {
-            await propertyNFT.connect(surveyor).signProperty(0);
-            await propertyNFT.connect(notary).signProperty(0);
-            await propertyNFT.connect(ivsl).signProperty(0);
-        });
-
-        describe("Deposits", function () {
-            it("should handle ETH deposits correctly", async function () {
-                await escrow.connect(buyer).depositPayment({ value: ethers.parseEther("1") });
-                expect(await ethers.provider.getBalance(escrowAddress)).to.equal(ethers.parseEther("1"));
-            });
-
-            it("should handle NFT deposits correctly", async function () {
-                await propertyNFT.connect(seller).approve(escrowAddress, 0);
-                await escrow.connect(seller).depositNFTAsset();
-                expect(await propertyNFT.ownerOf(0)).to.equal(escrowAddress);
-            });
-
-            it("should prevent incorrect payment amounts", async function () {
-                await expect(
-                    escrow.connect(buyer).depositPayment({ value: ethers.parseEther("0.5") })
-                ).to.be.revertedWith("Incorrect payment");
-            });
-
-            it("should prevent unauthorized deposits", async function () {
-                await expect(
-                    escrow.connect(seller).depositPayment({ value: ethers.parseEther("1") })
-                ).to.be.revertedWith("Only buyer");
-            });
-        });
-
-        describe("Escrow Flow", function () {
-            it("should complete full escrow cycle", async function () {
-                const initialSellerBalance = await ethers.provider.getBalance(seller.address);
-
-                await propertyNFT.connect(seller).approve(escrowAddress, 0);
-                await escrow.connect(buyer).depositPayment({ value: ethers.parseEther("1") });
-                await escrow.connect(seller).depositNFTAsset();
-                await escrow.connect(buyer).finalize();
-
-                expect(await propertyNFT.ownerOf(0)).to.equal(buyer.address);
-                const finalSellerBalance = await ethers.provider.getBalance(seller.address);
-
-                const balanceDiff = finalSellerBalance - initialSellerBalance;
-                expect(balanceDiff).to.be.closeTo(
-                    ethers.parseEther("1"),
-                    ethers.parseEther("0.01")
-                );
-            });
-
-            it("should prevent premature finalization", async function () {
-                await expect(
-                    escrow.connect(buyer).finalize()
-                ).to.be.revertedWith("Escrow not complete");
-            });
-
-            it("should prevent unauthorized finalization", async function () {
-                await escrow.connect(buyer).depositPayment({ value: ethers.parseEther("1") });
-                await expect(
-                    escrow.connect(seller).finalize()
-                ).to.be.revertedWith("Only buyer can finalize");
-            });
-        });
+    it("Should allow IVSL to sign", async function () {
+      await expect(propertyNFT.connect(ivsl).signProperty(0))
+        .to.emit(propertyNFT, "PropertySigned")
+        .withArgs(0, ivsl.address, "IVSL");
+      
+      expect(await propertyNFT.isSignedByIVSL(0)).to.be.true;
     });
+
+    it("Should not allow double signing by same role", async function () {
+      await propertyNFT.connect(surveyor).signProperty(0);
+      await expect(
+        propertyNFT.connect(surveyor).signProperty(0)
+      ).to.be.revertedWith("Already signed");
+    });
+
+    it("Should not allow unauthorized users to sign", async function () {
+      await expect(
+        propertyNFT.connect(user1).signProperty(0)
+      ).to.be.revertedWith("Not authorized to sign");
+    });
+
+    it("Should check if fully signed", async function () {
+      expect(await propertyNFT.isFullySigned(0)).to.be.false;
+      
+      await propertyNFT.connect(surveyor).signProperty(0);
+      expect(await propertyNFT.isFullySigned(0)).to.be.false;
+      
+      await propertyNFT.connect(notary).signProperty(0);
+      expect(await propertyNFT.isFullySigned(0)).to.be.false;
+      
+      await propertyNFT.connect(ivsl).signProperty(0);
+      expect(await propertyNFT.isFullySigned(0)).to.be.true;
+    });
+
+    it("Should get all signatures", async function () {
+      await propertyNFT.connect(surveyor).signProperty(0);
+      await propertyNFT.connect(notary).signProperty(0);
+      await propertyNFT.connect(ivsl).signProperty(0);
+
+      const [surveyorAddr, notaryAddr, ivslAddr] = await propertyNFT.getSignatures(0);
+      expect(surveyorAddr).to.equal(surveyor.address);
+      expect(notaryAddr).to.equal(notary.address);
+      expect(ivslAddr).to.equal(ivsl.address);
+    });
+  });
+
+  describe("Transfer Restrictions", function () {
+    beforeEach(async function () {
+      await propertyNFT.mintProperty(user1.address, "ipfs://test", "db://test");
+    });
+
+    it("Should not allow transfer without full signatures", async function () {
+      await expect(
+        propertyNFT.connect(user1).transferFrom(user1.address, user2.address, 0)
+      ).to.be.revertedWith("Property must be fully signed before transfer");
+    });
+
+    it("Should allow transfer with full signatures", async function () {
+      await propertyNFT.connect(surveyor).signProperty(0);
+      await propertyNFT.connect(notary).signProperty(0);
+      await propertyNFT.connect(ivsl).signProperty(0);
+
+      await propertyNFT.connect(user1).transferFrom(user1.address, user2.address, 0);
+      expect(await propertyNFT.ownerOf(0)).to.equal(user2.address);
+    });
+  });
+
+  describe("Power of Attorney (PoA)", function () {
+    beforeEach(async function () {
+      await propertyNFT.mintProperty(user1.address, "ipfs://test", "db://test");
+    });
+
+    it("Should set PoA for agent", async function () {
+      const now = Math.floor(Date.now() / 1000);
+      const oneYear = now + 365 * 24 * 60 * 60;
+
+      await expect(
+        propertyNFT.connect(user1).setPoA(0, agent.address, 3, true, now, oneYear)
+      ).to.emit(propertyNFT, "PoASet")
+        .withArgs(0, agent.address, 3, true, now, oneYear);
+    });
+
+    it("Should not allow non-owner to set PoA", async function () {
+      const now = Math.floor(Date.now() / 1000);
+      const oneYear = now + 365 * 24 * 60 * 60;
+
+      await expect(
+        propertyNFT.connect(user2).setPoA(0, agent.address, 3, true, now, oneYear)
+      ).to.be.revertedWith("Only owner can assign PoA");
+    });
+
+    it("Should reject invalid PoA period", async function () {
+      const now = Math.floor(Date.now() / 1000);
+
+      await expect(
+        propertyNFT.connect(user1).setPoA(0, agent.address, 3, true, now, now - 1)
+      ).to.be.revertedWith("Invalid period");
+    });
+  });
+
+  describe("Rent Management", function () {
+    beforeEach(async function () {
+      await propertyNFT.mintProperty(user1.address, "ipfs://test", "db://test");
+    });
+
+    it("Should set rent parameters", async function () {
+      const rentAmount = ethers.parseEther("1");
+      const period = 30 * 24 * 60 * 60;
+
+      await propertyNFT.connect(user1).setRent(0, rentAmount, period, user2.address);
+      
+      const rentInfo = await propertyNFT.rentInfo(0);
+      expect(rentInfo.amount).to.equal(rentAmount);
+      expect(rentInfo.period).to.equal(period);
+      expect(rentInfo.receiver).to.equal(user2.address);
+    });
+
+    it("Should not allow non-owner to set rent", async function () {
+      const rentAmount = ethers.parseEther("1");
+      const period = 30 * 24 * 60 * 60;
+
+      await expect(
+        propertyNFT.connect(user2).setRent(0, rentAmount, period, user2.address)
+      ).to.be.revertedWith("Only owner can set rent");
+    });
+
+    it("Should allow owner to pay rent", async function () {
+      const rentAmount = ethers.parseEther("1");
+      const period = 30 * 24 * 60 * 60;
+
+      await propertyNFT.connect(user1).setRent(0, rentAmount, period, user2.address);
+
+      const balanceBefore = await ethers.provider.getBalance(user2.address);
+      
+      await expect(
+        propertyNFT.connect(user1).payRent(0, { value: rentAmount })
+      ).to.emit(propertyNFT, "RentPaid");
+
+      const balanceAfter = await ethers.provider.getBalance(user2.address);
+      expect(balanceAfter - balanceBefore).to.equal(rentAmount);
+    });
+
+    it("Should not allow rent payment with incorrect amount", async function () {
+      const rentAmount = ethers.parseEther("1");
+      const period = 30 * 24 * 60 * 60;
+
+      await propertyNFT.connect(user1).setRent(0, rentAmount, period, user2.address);
+
+      await expect(
+        propertyNFT.connect(user1).payRent(0, { value: ethers.parseEther("0.5") })
+      ).to.be.revertedWith("Incorrect amount");
+    });
+
+    it("Should check rent active status", async function () {
+      const rentAmount = ethers.parseEther("1");
+      const period = 30 * 24 * 60 * 60;
+
+      await propertyNFT.connect(user1).setRent(0, rentAmount, period, user2.address);
+      await propertyNFT.connect(user1).payRent(0, { value: rentAmount });
+
+      expect(await propertyNFT.isRentActive(0)).to.be.true;
+    });
+  });
+
+  describe("Role Management", function () {
+    it("Should get roles correctly", async function () {
+      const [isSurveyor, isNotary, isIVSL] = await propertyNFT.getRolesOf(surveyor.address);
+      expect(isSurveyor).to.be.true;
+      expect(isNotary).to.be.false;
+      expect(isIVSL).to.be.false;
+    });
+
+    it("Should return false for address with no roles", async function () {
+      const [isSurveyor, isNotary, isIVSL] = await propertyNFT.getRolesOf(user1.address);
+      expect(isSurveyor).to.be.false;
+      expect(isNotary).to.be.false;
+      expect(isIVSL).to.be.false;
+    });
+  });
 });
