@@ -47,25 +47,28 @@ describe("PropertyNFT", function () {
     });
 
     it("Should allow surveyor to sign", async function () {
-      await expect(propertyNFT.connect(surveyor).signProperty(0))
-        .to.emit(propertyNFT, "PropertySigned")
-        .withArgs(0, surveyor.address, "SURVEYOR");
+      const tx = await propertyNFT.connect(surveyor).signProperty(0);
+      await tx.wait();
+      
+      expect(tx).to.emit(propertyNFT, "PropertySigned").withArgs(0, surveyor.address, "SURVEYOR");
       
       expect(await propertyNFT.isSignedBySurveyor(0)).to.be.true;
     });
 
     it("Should allow notary to sign", async function () {
-      await expect(propertyNFT.connect(notary).signProperty(0))
-        .to.emit(propertyNFT, "PropertySigned")
-        .withArgs(0, notary.address, "NOTARY");
+      const tx = await propertyNFT.connect(notary).signProperty(0);
+      await tx.wait();
+      
+      expect(tx).to.emit(propertyNFT, "PropertySigned").withArgs(0, notary.address, "NOTARY");
       
       expect(await propertyNFT.isSignedByNotary(0)).to.be.true;
     });
 
     it("Should allow IVSL to sign", async function () {
-      await expect(propertyNFT.connect(ivsl).signProperty(0))
-        .to.emit(propertyNFT, "PropertySigned")
-        .withArgs(0, ivsl.address, "IVSL");
+      const tx = await propertyNFT.connect(ivsl).signProperty(0);
+      await tx.wait();
+      
+      expect(tx).to.emit(propertyNFT, "PropertySigned").withArgs(0, ivsl.address, "IVSL");
       
       expect(await propertyNFT.isSignedByIVSL(0)).to.be.true;
     });
@@ -138,10 +141,10 @@ describe("PropertyNFT", function () {
       const now = Math.floor(Date.now() / 1000);
       const oneYear = now + 365 * 24 * 60 * 60;
 
-      await expect(
-        propertyNFT.connect(user1).setPoA(0, agent.address, 3, true, now, oneYear)
-      ).to.emit(propertyNFT, "PoASet")
-        .withArgs(0, agent.address, 3, true, now, oneYear);
+      const tx = await propertyNFT.connect(user1).setPoA(0, agent.address, 3, true, now, oneYear);
+      await tx.wait();
+      
+      expect(tx).to.emit(propertyNFT, "PoASet").withArgs(0, agent.address, 3, true, now, oneYear);
     });
 
     it("Should not allow non-owner to set PoA", async function () {
@@ -199,9 +202,10 @@ describe("PropertyNFT", function () {
 
       const balanceBefore = await ethers.provider.getBalance(user2.address);
       
-      await expect(
-        propertyNFT.connect(user1).payRent(0, { value: rentAmount })
-      ).to.emit(propertyNFT, "RentPaid");
+      const tx = await propertyNFT.connect(user1).payRent(0, { value: rentAmount });
+      await tx.wait();
+      
+      expect(tx).to.emit(propertyNFT, "RentPaid");
 
       const balanceAfter = await ethers.provider.getBalance(user2.address);
       expect(balanceAfter - balanceBefore).to.equal(rentAmount);

@@ -69,7 +69,12 @@ contract FractionTokenFactory is ReentrancyGuard {
         
         require(senderBalance == totalSupply, "Must own 100% of fractions");
         
-        fractionToken.burn(totalSupply);
+        require(
+            fractionToken.transferFrom(msg.sender, address(this), totalSupply),
+            "Failed to transfer tokens"
+        );
+        
+        FractionalToken(fractionTokenAddr).burn(totalSupply);
         
         IERC721(propertyNFTAddr).transferFrom(address(this), to, propertyId);
         
@@ -93,7 +98,12 @@ contract FractionTokenFactory is ReentrancyGuard {
         
         require(senderBalance == totalSupply, "Must own 100% of fractions");
         
-        fractionToken.burn(totalSupply);
+        require(
+            fractionToken.transferFrom(msg.sender, address(this), totalSupply),
+            "Failed to transfer tokens"
+        );
+        
+        FractionalToken(fractionTokenAddr).burn(totalSupply);
         
         IERC721(propertyNFTAddr).transferFrom(address(this), msg.sender, propertyId);
         
