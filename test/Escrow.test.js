@@ -4,6 +4,7 @@ const { ethers } = require("hardhat");
 describe("Escrow System", function () {
   let propertyNFT, fractionFactory, escrowFactory;
   let owner, surveyor, notary, ivsl, buyer, seller;
+  let propertyTokenId;
 
   beforeEach(async function () {
     [owner, surveyor, notary, ivsl, buyer, seller] = await ethers.getSigners();
@@ -27,11 +28,6 @@ describe("Escrow System", function () {
     const EscrowFactory = await ethers.getContractFactory("EscrowFactory");
     escrowFactory = await EscrowFactory.deploy();
     await escrowFactory.waitForDeployment();
-
-    await propertyNFT.mintProperty(seller.address, "ipfs://test", "db://test");
-    await propertyNFT.connect(surveyor).signProperty(0);
-    await propertyNFT.connect(notary).signProperty(0);
-    await propertyNFT.connect(ivsl).signProperty(0);
   });
 
   describe("NFT Escrow", function () {
@@ -39,12 +35,18 @@ describe("Escrow System", function () {
     const price = ethers.parseEther("10");
 
     beforeEach(async function () {
+      await propertyNFT.mintProperty(seller.address, "ipfs://test", "db://test");
+      propertyTokenId = 0;
+      await propertyNFT.connect(surveyor).signProperty(propertyTokenId);
+      await propertyNFT.connect(notary).signProperty(propertyTokenId);
+      await propertyNFT.connect(ivsl).signProperty(propertyTokenId);
+      
       const tx = await escrowFactory.createNFTEscrow(
         buyer.address,
         seller.address,
         price,
         await propertyNFT.getAddress(),
-        0
+        propertyTokenId
       );
       const receipt = await tx.wait();
       
@@ -90,7 +92,7 @@ describe("Escrow System", function () {
     });
 
     it("Should allow seller to deposit NFT", async function () {
-      await propertyNFT.connect(seller).approve(escrowAddress, 0);
+      await propertyNFT.connect(seller).approve(escrowAddress, propertyTokenId);
       
       const tx = await escrow.connect(seller).depositNFTAsset();
       await tx.wait();
@@ -99,12 +101,12 @@ describe("Escrow System", function () {
 
       const [, isSellerDeposited] = await escrow.getStatus();
       expect(isSellerDeposited).to.be.true;
-      expect(await propertyNFT.ownerOf(0)).to.equal(escrowAddress);
+      expect(await propertyNFT.ownerOf(propertyTokenId)).to.equal(escrowAddress);
     });
 
     it("Should finalize escrow", async function () {
       await escrow.connect(buyer).depositPayment({ value: price });
-      await propertyNFT.connect(seller).approve(escrowAddress, 0);
+      await propertyNFT.connect(seller).approve(escrowAddress, propertyTokenId);
       await escrow.connect(seller).depositNFTAsset();
 
       const sellerBalanceBefore = await ethers.provider.getBalance(seller.address);
@@ -114,7 +116,7 @@ describe("Escrow System", function () {
       ).to.emit(escrow, "EscrowFinalized")
         .withArgs(buyer.address, seller.address);
 
-      expect(await propertyNFT.ownerOf(0)).to.equal(buyer.address);
+      expect(await propertyNFT.ownerOf(propertyTokenId)).to.equal(buyer.address);
       
       const sellerBalanceAfter = await ethers.provider.getBalance(seller.address);
       expect(sellerBalanceAfter - sellerBalanceBefore).to.equal(price);
@@ -139,7 +141,7 @@ describe("Escrow System", function () {
 
     it("Should cancel escrow and refund", async function () {
       await escrow.connect(buyer).depositPayment({ value: price });
-      await propertyNFT.connect(seller).approve(escrowAddress, 0);
+      await propertyNFT.connect(seller).approve(escrowAddress, propertyTokenId);
       await escrow.connect(seller).depositNFTAsset();
 
       const buyerBalanceBefore = await ethers.provider.getBalance(buyer.address);
@@ -148,7 +150,7 @@ describe("Escrow System", function () {
         escrow.connect(buyer).cancel()
       ).to.emit(escrow, "EscrowCancelled");
 
-      expect(await propertyNFT.ownerOf(0)).to.equal(seller.address);
+      expect(await propertyNFT.ownerOf(propertyTokenId)).to.equal(seller.address);
     });
 
     it("Should cancel with only buyer deposit", async function () {
@@ -166,23 +168,30 @@ describe("Escrow System", function () {
   });
 
   describe("Fractional Escrow", function () {
-    let escrowAddress, escrow, fractionalToken;
+    let escrowAddress, escrow, fractionalToken, fractionalTokenId;
     const price = ethers.parseEther("5");
     const totalSupply = ethers.parseUnits("1000000", 18);
     const fractionAmount = ethers.parseUnits("100000", 18);
 
     beforeEach(async function () {
+      await propertyNFT.mintProperty(seller.address, "ipfs://test2", "db://test2");
+      fractionalTokenId = (await propertyNFT.nextTokenId()) - 1n;
+      
+      await propertyNFT.connect(surveyor).signProperty(fractionalTokenId);
+      await propertyNFT.connect(notary).signProperty(fractionalTokenId);
+      await propertyNFT.connect(ivsl).signProperty(fractionalTokenId);
+      
       const factoryAddress = await fractionFactory.getAddress();
-      await propertyNFT.connect(seller).approve(factoryAddress, 0);
+      await propertyNFT.connect(seller).approve(factoryAddress, fractionalTokenId);
       await fractionFactory.connect(seller).createFractionToken(
-        0,
+        fractionalTokenId,
         "Property Token",
         "PTKN",
         totalSupply,
         await propertyNFT.getAddress()
       );
 
-      const tokenAddress = await fractionFactory.propertyToFractionToken(0);
+      const tokenAddress = await fractionFactory.propertyToFractionToken(fractionalTokenId);
       fractionalToken = await ethers.getContractAt("FractionalToken", tokenAddress);
 
       const tx = await escrowFactory.createFractionalEscrow(
@@ -190,7 +199,7 @@ describe("Escrow System", function () {
         seller.address,
         price,
         await propertyNFT.getAddress(),
-        0,
+        fractionalTokenId,
         tokenAddress,
         fractionAmount
       );

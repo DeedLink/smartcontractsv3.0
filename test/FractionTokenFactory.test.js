@@ -37,15 +37,16 @@ describe("FractionTokenFactory", function () {
       
       await propertyNFT.connect(user1).approve(factoryAddress, 0);
       
-      await expect(
-        fractionFactory.connect(user1).createFractionToken(
-          0,
-          "Property Token",
-          "PTKN",
-          totalSupply,
-          await propertyNFT.getAddress()
-        )
-      ).to.emit(fractionFactory, "FractionTokenCreated");
+      const tx = await fractionFactory.connect(user1).createFractionToken(
+        0,
+        "Property Token",
+        "PTKN",
+        totalSupply,
+        await propertyNFT.getAddress()
+      );
+      await tx.wait();
+      
+      expect(tx).to.emit(fractionFactory, "FractionTokenCreated");
 
       const tokenAddress = await fractionFactory.propertyToFractionToken(0);
       expect(tokenAddress).to.not.equal(ethers.ZeroAddress);
@@ -56,6 +57,10 @@ describe("FractionTokenFactory", function () {
       const factoryAddress = await fractionFactory.getAddress();
       
       await propertyNFT.connect(user1).approve(factoryAddress, 0);
+      
+      const ownerBefore = await propertyNFT.ownerOf(0);
+      expect(ownerBefore).to.equal(user1.address);
+      
       await fractionFactory.connect(user1).createFractionToken(
         0,
         "Property Token",
@@ -166,12 +171,13 @@ describe("FractionTokenFactory", function () {
       
       await token.connect(user1).approve(await fractionFactory.getAddress(), totalSupply);
       
-      await expect(
-        fractionFactory.connect(user1).defractionalizeProperty(
-          0,
-          await propertyNFT.getAddress()
-        )
-      ).to.emit(fractionFactory, "PropertyDefractionalized");
+      const tx = await fractionFactory.connect(user1).defractionalizeProperty(
+        0,
+        await propertyNFT.getAddress()
+      );
+      await tx.wait();
+      
+      expect(tx).to.emit(fractionFactory, "PropertyDefractionalized");
 
       expect(await propertyNFT.ownerOf(0)).to.equal(user1.address);
       expect(await fractionFactory.isPropertyFractionalized(0)).to.be.false;
@@ -197,7 +203,9 @@ describe("FractionTokenFactory", function () {
       const FractionalToken = await ethers.getContractFactory("FractionalToken");
       const token = FractionalToken.attach(tokenAddress);
 
+      const totalSupply = ethers.parseUnits("1000000", 18);
       const balanceBefore = await token.balanceOf(user1.address);
+      expect(balanceBefore).to.equal(totalSupply);
       
       await token.connect(user1).approve(await fractionFactory.getAddress(), balanceBefore);
       
@@ -208,10 +216,15 @@ describe("FractionTokenFactory", function () {
 
       const balanceAfter = await token.balanceOf(user1.address);
       expect(balanceAfter).to.equal(0);
+      
+      const factoryBalance = await token.balanceOf(await fractionFactory.getAddress());
+      expect(factoryBalance).to.equal(0);
     });
   });
 
   describe("Transfer Full Ownership", function () {
+    let tokenAddress, token;
+    
     beforeEach(async function () {
       const totalSupply = ethers.parseUnits("1000000", 18);
       const factoryAddress = await fractionFactory.getAddress();
@@ -224,32 +237,29 @@ describe("FractionTokenFactory", function () {
         totalSupply,
         await propertyNFT.getAddress()
       );
+      
+      tokenAddress = await fractionFactory.propertyToFractionToken(0);
+      token = await ethers.getContractAt("FractionalToken", tokenAddress);
     });
 
     it("Should transfer full ownership to another address", async function () {
-      const tokenAddress = await fractionFactory.propertyToFractionToken(0);
-      const token = await ethers.getContractAt("FractionalToken", tokenAddress);
       const totalSupply = await token.balanceOf(user1.address);
       
       await token.connect(user1).approve(await fractionFactory.getAddress(), totalSupply);
       
-      await expect(
-        fractionFactory.connect(user1).transferFullOwnership(
-          0,
-          user2.address,
-          await propertyNFT.getAddress()
-        )
-      ).to.emit(fractionFactory, "FullOwnershipTransferred")
-        .withArgs(0, user1.address, user2.address);
+      const tx = await fractionFactory.connect(user1).transferFullOwnership(
+        0,
+        user2.address,
+        await propertyNFT.getAddress()
+      );
+      await tx.wait();
+      
+      expect(tx).to.emit(fractionFactory, "FullOwnershipTransferred").withArgs(0, user1.address, user2.address);
 
       expect(await propertyNFT.ownerOf(0)).to.equal(user2.address);
     });
 
     it("Should not transfer without 100% ownership", async function () {
-      const tokenAddress = await fractionFactory.propertyToFractionToken(0);
-      const FractionalToken = await ethers.getContractFactory("FractionalToken");
-      const token = FractionalToken.attach(tokenAddress);
-
       await token.connect(user1).transfer(user2.address, ethers.parseUnits("100", 18));
 
       await expect(
