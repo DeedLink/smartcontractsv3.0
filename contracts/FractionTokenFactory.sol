@@ -63,16 +63,13 @@ contract FractionTokenFactory is ReentrancyGuard {
         address fractionTokenAddr = propertyToFractionToken[propertyId];
         require(fractionTokenAddr != address(0), "Fraction token not found");
         
-        IERC20 fractionToken = IERC20(fractionTokenAddr);
+        FractionalToken fractionToken = FractionalToken(fractionTokenAddr);
         uint256 totalSupply = propertyToTotalSupply[propertyId];
         uint256 senderBalance = fractionToken.balanceOf(msg.sender);
         
         require(senderBalance == totalSupply, "Must own 100% of fractions");
         
-        require(
-            fractionToken.transferFrom(msg.sender, address(0xdead), totalSupply),
-            "Failed to burn tokens"
-        );
+        fractionToken.burn(totalSupply);
         
         IERC721(propertyNFTAddr).transferFrom(address(this), to, propertyId);
         
@@ -90,16 +87,13 @@ contract FractionTokenFactory is ReentrancyGuard {
         address fractionTokenAddr = propertyToFractionToken[propertyId];
         require(fractionTokenAddr != address(0), "Fraction token not found");
         
-        IERC20 fractionToken = IERC20(fractionTokenAddr);
+        FractionalToken fractionToken = FractionalToken(fractionTokenAddr);
         uint256 totalSupply = propertyToTotalSupply[propertyId];
         uint256 senderBalance = fractionToken.balanceOf(msg.sender);
         
         require(senderBalance == totalSupply, "Must own 100% of fractions");
         
-        require(
-            fractionToken.transferFrom(msg.sender, address(0xdead), totalSupply),
-            "Failed to burn tokens"
-        );
+        fractionToken.burn(totalSupply);
         
         IERC721(propertyNFTAddr).transferFrom(address(this), msg.sender, propertyId);
         

@@ -12,4 +12,8 @@ contract FractionalToken is ERC20 {
         propertyId = _propertyId;
         _mint(ownerAddr, supply);
     }
+
+    function burn(uint256 amount) external {
+        _burn(msg.sender, amount);
+    }
 }
