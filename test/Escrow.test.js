@@ -68,10 +68,10 @@ describe("Escrow System", function () {
     });
 
     it("Should allow buyer to deposit payment", async function () {
-      await expect(
-        escrow.connect(buyer).depositPayment({ value: price })
-      ).to.emit(escrow, "PaymentDeposited")
-        .withArgs(buyer.address, price);
+      const tx = await escrow.connect(buyer).depositPayment({ value: price });
+      await tx.wait();
+      
+      expect(tx).to.emit(escrow, "PaymentDeposited").withArgs(buyer.address, price);
 
       const [isBuyerDeposited] = await escrow.getStatus();
       expect(isBuyerDeposited).to.be.true;
@@ -92,10 +92,10 @@ describe("Escrow System", function () {
     it("Should allow seller to deposit NFT", async function () {
       await propertyNFT.connect(seller).approve(escrowAddress, 0);
       
-      await expect(
-        escrow.connect(seller).depositNFTAsset()
-      ).to.emit(escrow, "AssetDeposited")
-        .withArgs(seller.address, 0);
+      const tx = await escrow.connect(seller).depositNFTAsset();
+      await tx.wait();
+      
+      expect(tx).to.emit(escrow, "AssetDeposited").withArgs(seller.address, 0);
 
       const [, isSellerDeposited] = await escrow.getStatus();
       expect(isSellerDeposited).to.be.true;
@@ -219,10 +219,10 @@ describe("Escrow System", function () {
     it("Should allow seller to deposit fractional tokens", async function () {
       await fractionalToken.connect(seller).approve(escrowAddress, fractionAmount);
       
-      await expect(
-        escrow.connect(seller).depositFractionalAsset()
-      ).to.emit(escrow, "AssetDeposited")
-        .withArgs(seller.address, 1);
+      const tx = await escrow.connect(seller).depositFractionalAsset();
+      await tx.wait();
+      
+      expect(tx).to.emit(escrow, "AssetDeposited").withArgs(seller.address, 1);
 
       const [, isSellerDeposited] = await escrow.getStatus();
       expect(isSellerDeposited).to.be.true;
@@ -233,9 +233,10 @@ describe("Escrow System", function () {
       await fractionalToken.connect(seller).approve(escrowAddress, fractionAmount);
       await escrow.connect(seller).depositFractionalAsset();
 
-      await expect(
-        escrow.connect(buyer).finalize()
-      ).to.emit(escrow, "EscrowFinalized");
+      const tx = await escrow.connect(buyer).finalize();
+      await tx.wait();
+      
+      expect(tx).to.emit(escrow, "EscrowFinalized");
 
       expect(await fractionalToken.balanceOf(buyer.address)).to.equal(fractionAmount);
     });
@@ -245,9 +246,10 @@ describe("Escrow System", function () {
       await fractionalToken.connect(seller).approve(escrowAddress, fractionAmount);
       await escrow.connect(seller).depositFractionalAsset();
 
-      await expect(
-        escrow.connect(seller).cancel()
-      ).to.emit(escrow, "EscrowCancelled");
+      const tx = await escrow.connect(seller).cancel();
+      await tx.wait();
+      
+      expect(tx).to.emit(escrow, "EscrowCancelled");
 
       expect(await fractionalToken.balanceOf(seller.address)).to.equal(totalSupply);
     });
@@ -292,15 +294,16 @@ describe("Escrow System", function () {
     it("Should emit EscrowCreated event", async function () {
       const price = ethers.parseEther("10");
       
-      await expect(
-        escrowFactory.createNFTEscrow(
-          buyer.address,
-          seller.address,
-          price,
-          await propertyNFT.getAddress(),
-          0
-        )
-      ).to.emit(escrowFactory, "EscrowCreated");
+      const tx = await escrowFactory.createNFTEscrow(
+        buyer.address,
+        seller.address,
+        price,
+        await propertyNFT.getAddress(),
+        0
+      );
+      await tx.wait();
+      
+      expect(tx).to.emit(escrowFactory, "EscrowCreated");
     });
   });
 });

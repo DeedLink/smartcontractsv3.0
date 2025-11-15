@@ -160,6 +160,12 @@ describe("FractionTokenFactory", function () {
     });
 
     it("Should defractionalize with 100% ownership", async function () {
+      const tokenAddress = await fractionFactory.propertyToFractionToken(0);
+      const token = await ethers.getContractAt("FractionalToken", tokenAddress);
+      const totalSupply = await token.balanceOf(user1.address);
+      
+      await token.connect(user1).approve(await fractionFactory.getAddress(), totalSupply);
+      
       await expect(
         fractionFactory.connect(user1).defractionalizeProperty(
           0,
@@ -193,6 +199,8 @@ describe("FractionTokenFactory", function () {
 
       const balanceBefore = await token.balanceOf(user1.address);
       
+      await token.connect(user1).approve(await fractionFactory.getAddress(), balanceBefore);
+      
       await fractionFactory.connect(user1).defractionalizeProperty(
         0,
         await propertyNFT.getAddress()
@@ -219,6 +227,12 @@ describe("FractionTokenFactory", function () {
     });
 
     it("Should transfer full ownership to another address", async function () {
+      const tokenAddress = await fractionFactory.propertyToFractionToken(0);
+      const token = await ethers.getContractAt("FractionalToken", tokenAddress);
+      const totalSupply = await token.balanceOf(user1.address);
+      
+      await token.connect(user1).approve(await fractionFactory.getAddress(), totalSupply);
+      
       await expect(
         fractionFactory.connect(user1).transferFullOwnership(
           0,

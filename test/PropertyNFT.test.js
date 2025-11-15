@@ -194,6 +194,9 @@ describe("PropertyNFT", function () {
 
       await propertyNFT.connect(user1).setRent(0, rentAmount, period, user2.address);
 
+      await ethers.provider.send("evm_increaseTime", [period]);
+      await ethers.provider.send("evm_mine");
+
       const balanceBefore = await ethers.provider.getBalance(user2.address);
       
       await expect(
@@ -220,6 +223,10 @@ describe("PropertyNFT", function () {
       const period = 30 * 24 * 60 * 60;
 
       await propertyNFT.connect(user1).setRent(0, rentAmount, period, user2.address);
+      
+      await ethers.provider.send("evm_increaseTime", [period]);
+      await ethers.provider.send("evm_mine");
+      
       await propertyNFT.connect(user1).payRent(0, { value: rentAmount });
 
       expect(await propertyNFT.isRentActive(0)).to.be.true;

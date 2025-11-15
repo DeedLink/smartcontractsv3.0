@@ -90,6 +90,8 @@ describe("Integration Tests - Complete Workflows", function () {
       const token = await ethers.getContractAt("FractionalToken", tokenAddress);
       expect(await token.balanceOf(seller.address)).to.equal(totalSupply);
 
+      await token.connect(seller).approve(factoryAddress, totalSupply);
+      
       await fractionFactory.connect(seller).defractionalizeProperty(
         0,
         await propertyNFT.getAddress()
@@ -253,6 +255,9 @@ describe("Integration Tests - Complete Workflows", function () {
       const now = Math.floor(Date.now() / 1000);
       const oneYear = now + 365 * 24 * 60 * 60;
       await propertyNFT.connect(seller).setPoA(0, buyer.address, 3, true, now, oneYear);
+
+      await ethers.provider.send("evm_increaseTime", [period]);
+      await ethers.provider.send("evm_mine");
 
       const balanceBefore = await ethers.provider.getBalance(owner.address);
 
