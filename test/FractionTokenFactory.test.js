@@ -86,8 +86,7 @@ describe("FractionTokenFactory", function () {
       );
 
       const tokenAddress = await fractionFactory.propertyToFractionToken(0);
-      const FractionalToken = await ethers.getContractFactory("FractionalToken");
-      const token = FractionalToken.attach(tokenAddress);
+      const token = await ethers.getContractAt("FractionalToken", tokenAddress);
 
       expect(await token.balanceOf(user1.address)).to.equal(totalSupply);
     });
@@ -185,8 +184,7 @@ describe("FractionTokenFactory", function () {
 
     it("Should not defractionalize without 100% ownership", async function () {
       const tokenAddress = await fractionFactory.propertyToFractionToken(0);
-      const FractionalToken = await ethers.getContractFactory("FractionalToken");
-      const token = FractionalToken.attach(tokenAddress);
+      const token = await ethers.getContractAt("FractionalToken", tokenAddress);
 
       await token.connect(user1).transfer(user2.address, ethers.parseUnits("100", 18));
 
@@ -200,8 +198,7 @@ describe("FractionTokenFactory", function () {
 
     it("Should burn tokens on defractionalization", async function () {
       const tokenAddress = await fractionFactory.propertyToFractionToken(0);
-      const FractionalToken = await ethers.getContractFactory("FractionalToken");
-      const token = FractionalToken.attach(tokenAddress);
+      const token = await ethers.getContractAt("FractionalToken", tokenAddress);
 
       const totalSupply = ethers.parseUnits("1000000", 18);
       const balanceBefore = await token.balanceOf(user1.address);
@@ -333,8 +330,7 @@ describe("FractionTokenFactory", function () {
       );
 
       const tokenAddress = await fractionFactory.propertyToFractionToken(0);
-      const FractionalToken = await ethers.getContractFactory("FractionalToken");
-      const token = FractionalToken.attach(tokenAddress);
+      const token = await ethers.getContractAt("FractionalToken", tokenAddress);
 
       const burnAmount = ethers.parseUnits("100", 18);
       await token.connect(user1).burn(burnAmount);

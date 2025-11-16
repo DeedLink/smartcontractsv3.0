@@ -152,7 +152,7 @@ describe("Marketplace", function () {
       const amount = ethers.parseUnits("100000", 18);
       const buyAmount = ethers.parseUnits("50000", 18);
       const pricePerToken = ethers.parseEther("0.01");
-      const totalPrice = pricePerToken * 50000n;
+      const totalPrice = (pricePerToken * buyAmount) / ethers.parseUnits("1", 18);
 
       await fractionalToken.connect(seller).approve(await marketplace.getAddress(), amount);
       await marketplace.connect(seller).listFractionalTokens(
@@ -180,7 +180,7 @@ describe("Marketplace", function () {
     it("Should mark listing inactive when all tokens sold", async function () {
       const amount = ethers.parseUnits("100000", 18);
       const pricePerToken = ethers.parseEther("0.01");
-      const totalPrice = pricePerToken * 100000n;
+      const totalPrice = (pricePerToken * amount) / ethers.parseUnits("1", 18);
 
       await fractionalToken.connect(seller).approve(await marketplace.getAddress(), amount);
       await marketplace.connect(seller).listFractionalTokens(
