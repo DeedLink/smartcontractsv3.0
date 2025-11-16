@@ -88,6 +88,13 @@ async function main() {
   await lastWillRegistry.setExecutorAuthorization(deployer.address, true);
   console.log("Deployer authorized as will executor");
 
+  console.log("\n=== Deploying Marketplace ===");
+  const Marketplace = await ethers.getContractFactory("Marketplace");
+  const marketplace = await Marketplace.deploy();
+  await marketplace.waitForDeployment();
+  const marketplaceAddress = await marketplace.getAddress();
+  console.log("Marketplace deployed to:", marketplaceAddress);
+
   console.log("\n=== Creating Example Last Will ===");
   const mintTx2 = await propertyNFT.mintProperty(seller.address, "ipfs://property2", "db://property2");
   await mintTx2.wait();
@@ -127,6 +134,7 @@ async function main() {
   console.log("EscrowFactory:", escrowFactoryAddress);
   console.log("StampFeeCollector:", stampFeeCollectorAddress);
   console.log("LastWillRegistry:", lastWillRegistryAddress);
+  console.log("Marketplace:", marketplaceAddress);
   console.log("\nAccounts:");
   console.log("Deployer:", deployer.address);
   console.log("Surveyor:", surveyor.address);
@@ -153,7 +161,8 @@ async function main() {
       FractionalToken: fractionTokenAddress,
       EscrowFactory: escrowFactoryAddress,
       StampFeeCollector: stampFeeCollectorAddress,
-      LastWillRegistry: lastWillRegistryAddress
+      LastWillRegistry: lastWillRegistryAddress,
+      Marketplace: marketplaceAddress
     },
     accounts: {
       deployer: deployer.address,
